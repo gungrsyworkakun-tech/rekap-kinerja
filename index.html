@@ -242,9 +242,10 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='4.6';
+var KLIEN_VERSI='4.7';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
+/* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
@@ -1155,7 +1156,7 @@ function formEditUser(id){
 async function muatAdmin(){
   var el=$('adminArea'); if(!el) return; el.innerHTML=skel(2);
   try{
-    var r=await Promise.all([api('ambilPengaturan'),api('ambilPengguna')]), p=r[0], us=r[1]; S.set=p; setTimeout(muatBackup,0);
+    var r=await Promise.all([api('ambilPengaturan'),api('ambilPengguna')]), p=r[0], us=r[1]; S.set=p; setTimeout(muatBackup,0); setTimeout(muatMysql,0);
     el.innerHTML='<div class="card"><div class="judul" style="margin-top:0">⚙️ Pengaturan surat</div>'+
       '<label style="margin-top:6px">Ditujukan kepada (Yth.)</label><input id="sKepada" value="'+esc(p.kepada)+'">'+
       '<label>Jabatan penandatangan</label><input id="sJab" value="'+esc(p.jabatanTtd)+'"><label>Nama penandatangan</label><input id="sNama" value="'+esc(p.namaTtd)+'">'+
@@ -1172,6 +1173,10 @@ async function muatAdmin(){
       '<div style="font-size:30px;font-weight:800;letter-spacing:5px;color:var(--pri);margin:8px 0" id="kodeDaftar">'+esc(p.kode)+'</div><button class="btn alt sm" data-aksi="gantiKode">Buat kode baru</button></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">💾 Backup data</div><div class="meta" id="infoBackup" style="margin-bottom:8px">Memuat…</div>'+
       '<button class="btn blok" style="margin-top:0" data-aksi="backupNow">Backup sekarang</button><button class="btn alt blok" id="btnOto" data-aksi="backupOto" style="margin-top:8px">…</button><div class="pesan hidden" id="pesanBackup"></div></div>'+
+      '<div class="card"><div class="judul" style="margin-top:0">🗄️ Sinkron ke MySQL</div><div class="meta" id="infoMysql" style="margin-bottom:6px">Memuat…</div>'+
+      '<label style="margin-top:6px">Alamat terima.php (harus https)</label><input id="myUrl" autocapitalize="none" placeholder="https://domainmu.com/terima.php">'+
+      '<label>Kunci rahasia</label><input type="password" id="myKunci" autocomplete="off" placeholder="Samakan dengan isi terima.php">'+
+      '<button class="btn blok" data-aksi="simpanMysql">Simpan pengaturan</button><button class="btn alt blok" data-aksi="sinkronMysql" style="margin-top:8px">Sinkron ke MySQL sekarang</button><div class="pesan hidden" id="pesanMysql"></div></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">👥 Pengguna ('+us.length+')</div><div class="hint" style="margin-top:0">Petugas hanya melihat data miliknya dan data akun lain yang <b>bidangnya sama</b>. Akun tanpa bidang hanya melihat datanya sendiri. Admin melihat semuanya.</div>'+(S.pengguna={},us.map(function(x){
         S.pengguna[x.id]=x;
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)"><div><b>'+esc(x.nama)+'</b><div class="meta">@'+esc(x.username)+(x.jabatan?' • '+esc(x.jabatan):'')+'</div>'+
@@ -1179,6 +1184,12 @@ async function muatAdmin(){
         '<button class="btn alt sm" data-aksi="editUser" data-id="'+x.id+'">'+ic('edit',16)+'Edit</button></div>';
       }).join(''))+'</div>';
   }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
+}
+async function muatMysql(){
+  try{
+    var m=await api('statusMysql'), el=$('infoMysql'); if(!el) return; S.my=m; $('myUrl').value=m.url||'';
+    el.innerHTML=(m.url?'Terhubung ke: <b>'+esc(m.url)+'</b>':'Belum diatur.')+(m.terakhir?'<br>Sinkron terakhir: <b>'+new Date(m.terakhir).toLocaleString('id-ID')+'</b><br>'+esc(m.hasil):'')+(m.galat?'<br><span style="color:var(--bad)">Gagal terakhir: '+esc(m.galat)+'</span>':'')+'<br>Data dikirim otomatis tiap hari bersama backup. Password tidak ikut terkirim.';
+  }catch(e){ var el2=$('infoMysql'); if(el2) el2.textContent=e.message; }
 }
 async function muatBackup(){
   try{
@@ -1393,6 +1404,8 @@ var AKSI={
   gantiPw:async function(b){ loading(b,'Menyimpan…'); try{ await api('gantiPassword',$('pwLama').value,$('pwBaru').value); $('pwLama').value=''; $('pwBaru').value=''; pk('pesanPw',true,'Password diganti.'); }catch(e){ pk('pesanPw',false,e.message); } selesai(b); },
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
   gantiKode:async function(b){ loading(b,'…'); try{ var k=await api('gantiKodeDaftar'); $('kodeDaftar').textContent=k; toast('Kode baru dibuat'); }catch(e){ toast(e.message); } selesai(b); },
+  simpanMysql:async function(b){ loading(b,'Menyimpan…'); try{ await api('aturMysql',{url:$('myUrl').value,kunci:$('myKunci').value}); $('myKunci').value=''; pk('pesanMysql',true,'Pengaturan MySQL tersimpan.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); } selesai(b); },
+  sinkronMysql:async function(b){ loading(b,'Mengirim data…'); try{ var r=await api('sinkronMysql'); pk('pesanMysql',true,'Berhasil: pengguna '+r.pengguna+', laporan '+r.dokumen+', kegiatan '+r.kegiatan+'.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); muatMysql(); } selesai(b); },
   backupNow:async function(b){ loading(b,'Membuat backup…'); try{ var r=await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil: '+r.laporanBaru+' laporan baru disimpan sebagai file.'+(r.laporanSisa?' Masih ada '+r.laporanSisa+' laporan, tekan lagi untuk melanjutkan.':'')); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
   backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: tiap hari sekitar jam 02.00–03.00.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
   editUser:function(b){ formEditUser(b.dataset.id); },
