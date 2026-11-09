@@ -256,15 +256,21 @@ function call(nama,args){
   return new Promise(function(res,rej){
     if(!(window.google&&google.script&&google.script.run)){
       if(!API_URL){ rej(new Error('API_URL belum diisi di Index.html')); return; }
-      fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:nama,args:args})})
-        .then(function(x){ return x.json(); })
-        .then(function(j){
-          if(j.ok){ res(j.hasil); return; }
-          var m=String(j.error||'Gagal');
-          if(m.indexOf('LOGIN')>=0){ keluarLokal(); rej(new Error('Sesi habis, silakan masuk lagi.')); return; }
-          rej(new Error(m.replace(/^(Error|Exception):\s*/,'')));
-        })
-        .catch(function(){ rej(new Error('Tidak bisa terhubung ke server. Cek internet atau link /exec.')); });
+      var coba=function(n){
+        fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:nama,args:args})})
+          .then(function(x){ if(!x.ok) throw new Error('HTTP '+x.status); return x.text(); })
+          .then(function(t){ var j; try{ j=JSON.parse(t); }catch(e){ throw new Error('Balasan server bukan JSON: '+t.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').slice(0,160)); }
+            if(j.ok){ res(j.hasil); return; }
+            var m=String(j.error||'Gagal');
+            if(m.indexOf('LOGIN')>=0){ keluarLokal(); rej(new Error('Sesi habis, silakan masuk lagi.')); return; }
+            rej(new Error(m.replace(/^(Error|Exception):\s*/,'')));
+          })
+          .catch(function(e){
+            if(n<1){ setTimeout(function(){ coba(n+1); },700); return; }
+            rej(new Error('Gagal menghubungi server ('+nama+'): '+((e&&e.message)||e)));
+          });
+      };
+      coba(0);
       return;
     }
     var r=google.script.run.withSuccessHandler(res).withFailureHandler(function(e){
