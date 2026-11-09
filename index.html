@@ -222,7 +222,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='4.0';
+var KLIEN_VERSI='4.1';
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
 var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
@@ -902,7 +902,7 @@ function formEditUser(id){
 async function muatAdmin(){
   var el=$('adminArea'); if(!el) return; el.innerHTML=skel(2);
   try{
-    var r=await Promise.all([api('ambilPengaturan'),api('ambilPengguna')]), p=r[0], us=r[1]; S.set=p;
+    var r=await Promise.all([api('ambilPengaturan'),api('ambilPengguna')]), p=r[0], us=r[1]; S.set=p; setTimeout(muatBackup,0);
     el.innerHTML='<div class="card"><div class="judul" style="margin-top:0">⚙️ Pengaturan surat</div>'+
       '<label style="margin-top:6px">Ditujukan kepada (Yth.)</label><input id="sKepada" value="'+esc(p.kepada)+'">'+
       '<label>Jabatan penandatangan</label><input id="sJab" value="'+esc(p.jabatanTtd)+'"><label>Nama penandatangan</label><input id="sNama" value="'+esc(p.namaTtd)+'">'+
@@ -917,6 +917,8 @@ async function muatAdmin(){
       '<button class="btn blok" data-aksi="simpanAI">Simpan pengaturan AI</button>'+(p.aiAktif?'<button class="btn alt blok" data-aksi="hapusKunciAI" style="margin-top:8px">Hapus kunci</button>':'')+'<div class="pesan hidden" id="pesanAI"></div></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">🔑 Kode pendaftaran</div><div class="meta">Bagikan ke pegawai yang boleh membuat akun.</div>'+
       '<div style="font-size:30px;font-weight:800;letter-spacing:5px;color:var(--pri);margin:8px 0" id="kodeDaftar">'+esc(p.kode)+'</div><button class="btn alt sm" data-aksi="gantiKode">Buat kode baru</button></div>'+
+      '<div class="card"><div class="judul" style="margin-top:0">💾 Backup data</div><div class="meta" id="infoBackup" style="margin-bottom:8px">Memuat…</div>'+
+      '<button class="btn blok" style="margin-top:0" data-aksi="backupNow">Backup sekarang</button><button class="btn alt blok" id="btnOto" data-aksi="backupOto" style="margin-top:8px">…</button><div class="pesan hidden" id="pesanBackup"></div></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">👥 Pengguna ('+us.length+')</div><div class="hint" style="margin-top:0">Petugas hanya melihat data miliknya dan data akun lain yang <b>bidangnya sama</b>. Akun tanpa bidang hanya melihat datanya sendiri. Admin melihat semuanya.</div>'+(S.pengguna={},us.map(function(x){
         S.pengguna[x.id]=x;
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)"><div><b>'+esc(x.nama)+'</b><div class="meta">@'+esc(x.username)+(x.jabatan?' • '+esc(x.jabatan):'')+'</div>'+
@@ -924,6 +926,13 @@ async function muatAdmin(){
         '<button class="btn alt sm" data-aksi="editUser" data-id="'+x.id+'">'+ic('edit',16)+'Edit</button></div>';
       }).join(''))+'</div>';
   }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
+}
+async function muatBackup(){
+  try{
+    var b=await api('statusBackup'), el=$('infoBackup'); if(!el) return; S.bk=b;
+    el.innerHTML='Salinan seluruh data disimpan di Google Drive, folder <b>Backup Rekap Kerja</b> ('+b.simpan+' terakhir disimpan).<br>Backup terakhir: <b>'+(b.terakhir?new Date(b.terakhir).toLocaleString('id-ID'):'belum pernah')+'</b>'+(b.url?'<br><a href="'+esc(b.url)+'" target="_blank" rel="noopener">Buka folder backup</a>':'');
+    $('btnOto').textContent=b.otomatis?'Backup harian: AKTIF (tekan untuk matikan)':'Aktifkan backup otomatis tiap hari';
+  }catch(e){ var el2=$('infoBackup'); if(el2) el2.textContent=e.message; }
 }
 function pk(id,ok,t){ var p=$(id); if(!p) return; p.className='pesan '+(ok?'ok':'gagal'); p.textContent=t; }
 
@@ -1122,6 +1131,8 @@ var AKSI={
   gantiPw:async function(b){ loading(b,'Menyimpan…'); try{ await api('gantiPassword',$('pwLama').value,$('pwBaru').value); $('pwLama').value=''; $('pwBaru').value=''; pk('pesanPw',true,'Password diganti.'); }catch(e){ pk('pesanPw',false,e.message); } selesai(b); },
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
   gantiKode:async function(b){ loading(b,'…'); try{ var k=await api('gantiKodeDaftar'); $('kodeDaftar').textContent=k; toast('Kode baru dibuat'); }catch(e){ toast(e.message); } selesai(b); },
+  backupNow:async function(b){ loading(b,'Membuat backup…'); try{ await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil disimpan di Drive.'); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
+  backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: tiap hari sekitar jam 02.00–03.00.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
   editUser:function(b){ formEditUser(b.dataset.id); },
   simpanUser:async function(b){ loading(b,'Menyimpan…'); try{ await api('ubahPengguna',b.dataset.id,{nama:$('uNama').value,nip:$('uNip').value,jabatan:$('uJab').value,bidang:$('uBid').value,peran:$('uPeran').value}); if(b.dataset.id===S.user.id){ S.user=(await api('saya')).user; } tutupLembar(); toast('Akun diperbarui ✅'); muatAdmin(); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
   resetPwUser:async function(b){ loading(b,'…'); try{ await api('resetPasswordPengguna',b.dataset.id,$('uPw').value); selesai(b); $('uPw').value=''; pk('pesanUser',true,'Password baru sudah diatur. Akun itu perlu masuk ulang.'); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
