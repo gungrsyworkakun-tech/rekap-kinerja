@@ -222,9 +222,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='4.2';
+var KLIEN_VERSI='4.3';
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
-var API_URL='https://script.google.com/macros/s/AKfycbwD7p33caLlrbXQXXcFsCTOpVDOlEMKUo2xObkm_b3SSsU0FXLeYNbQCsTLGpoMKWq5/exec';
+var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
 var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
 var BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 var HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -663,8 +663,9 @@ function menuBagi(id,tersimpan){
   function mi(w,ik,t,sub,aksi,extra){ return '<button class="mi" data-aksi="'+aksi+'" data-id="'+id+'" '+(extra||'')+'><div class="ik" style="background:'+w+'">'+ic(ik,20)+'</div><div><b>'+t+'</b><span>'+sub+'</span></div></button>'; }
   bukaLembar(tersimpan?'Tersimpan ✅ Bagikan?':'Bagikan & unduh',
     '<div class="card flat"><div class="badge" style="--wr:'+JENIS[x.jenis].warna+'">'+esc(JENIS[x.jenis].nama)+'</div><div class="judul" style="margin-bottom:0">'+esc(x.judul)+'</div></div>'+
+    mi('#1faa59','chat','Kirim teks + foto ke WhatsApp','Tanpa PDF, langsung teks laporan dan gambar','siapWAteks')+
     mi('#c0362c','file','Unduh PDF','Siap cetak atau kirim','ekspor','data-fmt="pdf"')+
-    mi('#1faa59','chat','Kirim PDF + foto ke WhatsApp','Laporan dan gambar terkirim sekaligus','siapWA')+
+    mi('#1faa59','chat','Kirim PDF + foto ke WhatsApp','Laporan resmi dan gambar terkirim sekaligus','siapWA')+
     mi('#1d4ba3','word','Unduh Word (.docx)','Bisa diedit lagi di Word','ekspor','data-fmt="docx"')+
     '<a class="mi" href="'+esc(waLink(teksWA(x)))+'" target="_blank" rel="noopener"><div class="ik" style="background:#1faa59">'+ic('chat',20)+'</div><div><b>Kirim ke WhatsApp (teks)</b><span>Tekan, lalu pilih kontak atau grup</span></div></a>'+
     mi('#667089','copy','Salin teks laporan','Tempel ke aplikasi lain','salin'));
@@ -974,33 +975,39 @@ function dataUrlKeFile(u,nama){
   var bin=atob(m[2]), arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
   return new File([arr],nama,{type:m[1]});
 }
-async function siapWA(id){
+async function siapWA(id,tanpaPdf){
   var x=S.dok[id]; if(!x) return;
-  bukaLembar('Menyiapkan…','<div class="kosong"><span class="spin g" style="width:28px;height:28px;border-width:3px"></span><p id="infoSiap">Menyusun PDF laporan…</p></div>');
+  bukaLembar('Menyiapkan…','<div class="kosong"><span class="spin g" style="width:28px;height:28px;border-width:3px"></span><p id="infoSiap">'+(tanpaPdf?'Menyiapkan foto…':'Menyusun PDF laporan…')+'</p></div>');
   try{
-    var f=await api('unduhDokumen',id,'pdf');
-    var bin=atob(f.base64), arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-    var files=[new File([arr],f.nama,{type:f.mime})];
+    var files=[], f={nama:'',mime:''};
+    if(!tanpaPdf){
+      f=await api('unduhDokumen',id,'pdf');
+      var bin=atob(f.base64), arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      files.push(new File([arr],f.nama,{type:f.mime}));
+    }
     var ids=x.fotoIds||[], gagal=0;
     for(var k=0;k<ids.length;k++){
       if($('infoSiap')) $('infoSiap').textContent='Mengambil foto '+(k+1)+' dari '+ids.length+'…';
       try{ files.push(dataUrlKeFile(await api('ambilFoto',ids[k]),'Foto-'+(k+1)+'.jpg')); }catch(e){ gagal++; }
     }
-    S.paket={files:files,teks:teksWA(x),nama:f.nama,url:URL.createObjectURL(files[0])};
+    S.paket={files:files,teks:teksWA(x),nama:f.nama,url:files.length&&!tanpaPdf?URL.createObjectURL(files[0]):'',tanpaPdf:!!tanpaPdf};
     bukaLembar('Siap dikirim ✅',
       '<div class="card flat"><div class="judul" style="margin-top:0">'+esc(x.judul)+'</div>'+
-      '<div class="meta">'+ic('file',15)+'1 PDF laporan'+(files.length>1?' + '+(files.length-1)+' foto':'')+'</div>'+
+      '<div class="meta">'+ic('file',15)+(tanpaPdf?'Teks laporan'+(files.length?' + '+files.length+' foto':' (tanpa foto)'):'1 PDF laporan'+(files.length>1?' + '+(files.length-1)+' foto':''))+'</div>'+
       (gagal?'<div class="pesan gagal">'+gagal+' foto gagal dimuat dan tidak ikut terkirim.</div>':'')+'</div>'+
       '<button class="btn wa blok" data-aksi="kirimPaket" style="margin-top:0">'+ic('chat',19)+'Kirim ke WhatsApp</button>'+
-      '<div class="hint" style="text-align:center;margin-top:10px">Setelah ditekan, pilih <b>WhatsApp</b> lalu pilih kontak atau grup. PDF dan foto terkirim sekaligus.</div>');
+      (tanpaPdf?'<button class="btn alt blok" data-aksi="salinPaket" style="margin-top:10px">'+ic('copy',18)+'Salin teks laporan</button>':'')+'<div class="hint" style="text-align:center;margin-top:10px">Setelah ditekan, pilih <b>WhatsApp</b> lalu pilih kontak atau grup. '+(tanpaPdf?'Teks dan foto terkirim sekaligus. Kalau teks tidak ikut muncul, tekan <b>Salin teks laporan</b> lalu tempel di kolom chat.':'PDF dan foto terkirim sekaligus.')+'</div>');
   }catch(e){ bukaLembar('Gagal','<div class="pesan gagal">'+esc(e.message)+'</div>'); }
 }
 async function kirimPaket(){
   var pk=S.paket; if(!pk) return;
   try{
+    if(pk.tanpaPdf&&!pk.files.length){ window.open(waLink(pk.teks),'_blank'); return; }
     if(navigator.canShare&&navigator.canShare({files:pk.files})){ await navigator.share({files:pk.files,text:pk.teks}); return; }
+    if(pk.tanpaPdf){ salinTeks(pk.teks); window.open(waLink(pk.teks),'_blank'); toast('Foto belum bisa dikirim langsung dari sini. Teks disalin.'); return; }
     toast('HP atau browser ini tidak mendukung kirim file langsung. Unduh dulu lalu lampirkan.');
   }catch(e){ if(e&&e.name==='AbortError') return; toast('Gagal membuka WhatsApp: '+(e.message||e)); }
+  if(!pk.url) return;
   var a=document.createElement('a'); a.href=pk.url; a.download=pk.nama; document.body.appendChild(a); a.click(); a.remove();
 }
 
@@ -1029,7 +1036,7 @@ function lihatDetail(id){
   });
   h+='<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b></div>';
   if(x.fotoIds&&x.fotoIds.length) h+='<div class="dt" style="margin-top:14px"><p class="k">Foto dokumentasi ('+x.fotoIds.length+')</p><div class="galeri2" id="galDt"><div class="kosong"><span class="spin g"></span></div></div></div>';
-  h+='</div><button class="btn wa blok" data-aksi="siapWA" data-id="'+id+'" style="margin-top:0">'+ic('chat',18)+'Kirim PDF + foto ke WhatsApp</button><button class="btn alt blok" data-aksi="bagi" data-id="'+id+'" style="margin-top:0">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
+  h+='</div><button class="btn wa blok" data-aksi="siapWAteks" data-id="'+id+'" style="margin-top:0">'+ic('chat',18)+'Kirim teks + foto ke WhatsApp</button><button class="btn alt blok" data-aksi="siapWA" data-id="'+id+'" style="margin-top:0">'+ic('file',18)+'Kirim PDF + foto ke WhatsApp</button><button class="btn alt blok" data-aksi="bagi" data-id="'+id+'" style="margin-top:0">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
     (x.bisaUbah?'<button class="btn alt blok" data-aksi="ubahDok" data-id="'+id+'">'+ic('edit',18)+'Ubah laporan</button>':'');
   bukaLembar('Detail laporan',h);
   if(x.fotoIds&&x.fotoIds.length){
@@ -1063,6 +1070,8 @@ var AKSI={
   fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); muatDok(); },
   ai:rapikanAI,
   siapWA:function(b){ siapWA(b.dataset.id); },
+  siapWAteks:function(b){ siapWA(b.dataset.id,true); },
+  salinPaket:function(){ if(S.paket) salinTeks(S.paket.teks); },
   kirimPaket:kirimPaket,
   simpanAI:async function(b){ loading(b,'Menyimpan…'); try{ var d={geminiModel:$('sModel').value}; if($('sKunci').value.trim()) d.geminiKey=$('sKunci').value; await api('simpanPengaturan',d); S.set=await api('ambilPengaturan'); pk('pesanAI',true,'Pengaturan AI tersimpan.'); muatAdmin(); }catch(e){ pk('pesanAI',false,e.message); } selesai(b); },
   hapusKunciAI:async function(b){ try{ await api('simpanPengaturan',{hapusGeminiKey:true}); toast('Kunci AI dihapus'); muatAdmin(); }catch(e){ toast(e.message); } },
