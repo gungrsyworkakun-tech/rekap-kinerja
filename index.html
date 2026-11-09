@@ -242,7 +242,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='4.7';
+var KLIEN_VERSI='4.9';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -1194,8 +1194,8 @@ async function muatMysql(){
 async function muatBackup(){
   try{
     var b=await api('statusBackup'), el=$('infoBackup'); if(!el) return; S.bk=b;
-    el.innerHTML='Disimpan di Google Drive, folder <b>Backup Rekap Kerja</b>: salinan seluruh data ('+b.simpan+' terakhir) dan semua laporan sebagai file <b>PDF + Word</b> (folder Laporan).<br>Backup terakhir: <b>'+(b.terakhir?new Date(b.terakhir).toLocaleString('id-ID'):'belum pernah')+'</b>'+(b.url?'<br><a href="'+esc(b.url)+'" target="_blank" rel="noopener">Buka folder backup</a>':'');
-    $('btnOto').textContent=b.otomatis?'Backup harian: AKTIF (tekan untuk matikan)':'Aktifkan backup otomatis tiap hari';
+    el.innerHTML='Disimpan di Google Drive, folder <b>Backup Rekap Kerja</b>: salinan seluruh data (terbaru + 1 per hari selama '+(b.hari||30)+' hari) dan semua laporan sebagai file <b>PDF + Word</b> (folder Laporan).<br>Backup terakhir: <b>'+(b.terakhir?new Date(b.terakhir).toLocaleString('id-ID'):'belum pernah')+'</b>'+(b.url?'<br><a href="'+esc(b.url)+'" target="_blank" rel="noopener">Buka folder backup</a>':'');
+    $('btnOto').textContent=b.otomatis?(b.jeda==='10 menit'?'Backup otomatis tiap 10 menit: AKTIF (tekan untuk matikan)':'Jadwal lama (harian) masih aktif. Tekan untuk matikan, lalu aktifkan lagi agar jadi tiap 10 menit'):'Aktifkan backup otomatis tiap 10 menit';
   }catch(e){ var el2=$('infoBackup'); if(el2) el2.textContent=e.message; }
 }
 function pk(id,ok,t){ var p=$(id); if(!p) return; p.className='pesan '+(ok?'ok':'gagal'); p.textContent=t; }
@@ -1407,7 +1407,7 @@ var AKSI={
   simpanMysql:async function(b){ loading(b,'Menyimpan…'); try{ await api('aturMysql',{url:$('myUrl').value,kunci:$('myKunci').value}); $('myKunci').value=''; pk('pesanMysql',true,'Pengaturan MySQL tersimpan.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); } selesai(b); },
   sinkronMysql:async function(b){ loading(b,'Mengirim data…'); try{ var r=await api('sinkronMysql'); pk('pesanMysql',true,'Berhasil: pengguna '+r.pengguna+', laporan '+r.dokumen+', kegiatan '+r.kegiatan+'.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); muatMysql(); } selesai(b); },
   backupNow:async function(b){ loading(b,'Membuat backup…'); try{ var r=await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil: '+r.laporanBaru+' laporan baru disimpan sebagai file.'+(r.laporanSisa?' Masih ada '+r.laporanSisa+' laporan, tekan lagi untuk melanjutkan.':'')); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
-  backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: tiap hari sekitar jam 02.00–03.00.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
+  backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: dicek tiap 10 menit, disimpan hanya kalau ada perubahan data.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
   editUser:function(b){ formEditUser(b.dataset.id); },
   simpanUser:async function(b){ loading(b,'Menyimpan…'); try{ await api('ubahPengguna',b.dataset.id,{nama:$('uNama').value,nip:$('uNip').value,jabatan:$('uJab').value,bidang:$('uBid').value,peran:$('uPeran').value}); if(b.dataset.id===S.user.id){ S.user=(await api('saya')).user; } tutupLembar(); toast('Akun diperbarui ✅'); muatAdmin(); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
   resetPwUser:async function(b){ loading(b,'…'); try{ await api('resetPasswordPengguna',b.dataset.id,$('uPw').value); selesai(b); $('uPw').value=''; pk('pesanUser',true,'Password baru sudah diatur. Akun itu perlu masuk ulang.'); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
