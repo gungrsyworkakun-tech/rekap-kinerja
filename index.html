@@ -222,7 +222,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='3.8';
+var KLIEN_VERSI='4.0';
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
 var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
@@ -805,7 +805,7 @@ function kartuDok(x){
   return '<div class="card doc" data-aksi="detail" data-id="'+x.id+'" style="--wr:'+J.warna+'"><span class="badge">'+ic(J.ik,13)+esc(J.nama)+'</span>'+
     '<p class="judul">'+esc(x.judul)+'</p><div class="meta">'+ic('cal',15)+esc(tglIndo(x.tanggal))+(d.jamMulai?' • '+esc(jamTitik(d.jamMulai)):'')+'</div>'+w+
     (ch?'<div class="chips">'+ch+'</div>':'')+
-    '<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b></div>'+
+    '<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b>'+(x.bidang&&S.user.peran==='admin'?' • '+esc(x.bidang):'')+'</div>'+
     '<div class="acts"><button class="btn" data-aksi="bagi" data-id="'+x.id+'">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
     (x.fotoIds.length?'<button class="btn alt ico" data-aksi="foto" data-ids="'+x.fotoIds.join(',')+'" aria-label="Foto">'+ic('img',19)+'</button>':'')+
     (x.bisaUbah?'<button class="btn alt ico" data-aksi="menuDok" data-id="'+x.id+'" aria-label="Lainnya">'+ic('more',19)+'</button>':'')+'</div></div>';
@@ -833,7 +833,7 @@ function kartuKeg(x){
     '<div class="meta">'+ic('cal',15)+esc(tglPendek(x.tanggal))+(x.jam?' • '+esc(jamTitik(x.jam)):'')+'</div>'+
     '<div class="chips">'+(x.kategori?'<span class="chip">'+esc(x.kategori)+'</span>':'')+'<span class="chip '+esc(x.status)+'">'+esc(x.status)+'</span>'+(x.volume?'<span class="chip">'+esc(x.volume)+' '+esc(x.satuan)+'</span>':'')+'</div>'+
     (x.detail?'<div class="isi">'+esc(x.detail)+'</div>':'')+(x.catatan?'<div class="catatan">'+esc(x.catatan)+'</div>':'')+
-    '<div class="oleh">Diinput oleh <b>'+esc(x.petugas)+'</b></div>'+
+    '<div class="oleh">Diinput oleh <b>'+esc(x.petugas)+'</b>'+(x.bidang&&S.user.peran==='admin'?' • '+esc(x.bidang):'')+'</div>'+
     ((x.fotoIds.length||x.bisaUbah)?'<div class="acts">'+(x.bisaUbah?'<button class="btn ghost" data-aksi="ubahKeg" data-id="'+x.id+'">'+ic('edit',17)+'Catatan / status / foto</button>':'')+
     (x.fotoIds.length?'<button class="btn alt ico" data-aksi="foto" data-ids="'+x.fotoIds.join(',')+'">'+ic('img',19)+'</button>':'')+'</div>':'')+'</div>';
 }
@@ -874,7 +874,7 @@ async function simpanUbahKeg(btn){
 /* ================= Akun ================= */
 function halAkun(){
   var u=S.user; judul('@'+u.username,u.nama);
-  $('isiHal').innerHTML='<div class="card"><div class="chips" style="margin:0 0 4px"><span class="chip">@'+esc(u.username)+'</span><span class="chip '+esc(u.peran)+'">'+(u.peran==='admin'?'Admin':'Petugas')+'</span></div>'+
+  $('isiHal').innerHTML='<div class="card"><div class="chips" style="margin:0 0 4px"><span class="chip">@'+esc(u.username)+'</span><span class="chip '+esc(u.peran)+'">'+(u.peran==='admin'?'Admin':'Petugas')+'</span><span class="chip">'+(u.bidang?esc(u.bidang):'Bidang belum diisi admin')+'</span></div>'+
     '<label>Nama lengkap</label><input id="pNama" value="'+esc(u.nama)+'"><div class="g2"><div><label>NIP</label><input id="pNip" value="'+esc(u.nip)+'"></div><div><label>Jabatan</label><input id="pJab" value="'+esc(u.jabatan)+'"></div></div>'+
     '<button class="btn blok" data-aksi="simpanProfil">Simpan profil</button><div class="pesan hidden" id="pesanProfil"></div></div>'+
     '<div class="card"><div class="judul" style="margin-top:0">Ganti password</div><label style="margin-top:6px">Password lama</label><input type="password" id="pwLama"><label>Password baru</label><input type="password" id="pwBaru">'+
@@ -882,6 +882,22 @@ function halAkun(){
     '<div class="card"><div class="judul" style="margin-top:0">Reset data</div><div class="meta" style="margin-bottom:10px">Pilih sendiri yang mau dihapus: draf, laporan per jenis, atau kegiatan.</div><button class="btn danger blok" style="margin-top:0" data-aksi="menuReset">Reset data…</button></div>'+
     '<button class="btn danger blok" data-aksi="keluar">'+ic('out',18)+'Keluar</button>';
   if(u.peran==='admin') muatAdmin();
+}
+
+function formEditUser(id){
+  var x=S.pengguna&&S.pengguna[id]; if(!x) return;
+  var bid={}; Object.keys(S.pengguna).forEach(function(k){ var b=S.pengguna[k].bidang; if(b) bid[b]=1; });
+  var dl=Object.keys(bid).map(function(b){ return '<option value="'+esc(b)+'">'; }).join('');
+  bukaLembar('Edit akun','<div class="card flat"><div class="meta" style="margin-bottom:4px">@'+esc(x.username)+'</div>'+
+    '<label style="margin-top:0">Nama lengkap <i>*</i></label><input id="uNama" value="'+esc(x.nama)+'">'+
+    '<div class="g2"><div><label>NIP</label><input id="uNip" value="'+esc(x.nip)+'"></div><div><label>Jabatan</label><input id="uJab" value="'+esc(x.jabatan)+'"></div></div>'+
+    '<label>Bidang</label><input id="uBid" list="dlBid" value="'+esc(x.bidang||'')+'" placeholder="mis. Teknik, Operasi, Umum"><datalist id="dlBid">'+dl+'</datalist>'+
+    '<div class="hint">Akun dengan nama bidang yang sama bisa saling melihat laporan &amp; kegiatan. Beda bidang = tidak terlihat.</div>'+
+    '<label>Peran</label><select id="uPeran"><option value="petugas"'+(x.peran==='petugas'?' selected':'')+'>Petugas</option><option value="admin"'+(x.peran==='admin'?' selected':'')+'>Admin</option></select></div>'+
+    '<button class="btn blok" data-aksi="simpanUser" data-id="'+id+'" style="margin-top:0">Simpan perubahan</button>'+
+    '<div class="card flat" style="margin-top:12px"><label style="margin-top:0">Password baru untuk akun ini</label><input type="text" id="uPw" autocomplete="off" placeholder="minimal 6 karakter"><button class="btn alt blok" data-aksi="resetPwUser" data-id="'+id+'">Atur password baru</button></div>'+
+    (id===S.user.id?'':'<button class="btn danger blok" data-aksi="hapusUser" data-id="'+id+'">Hapus akun ini</button>')+
+    '<div class="pesan hidden" id="pesanUser"></div>');
 }
 async function muatAdmin(){
   var el=$('adminArea'); if(!el) return; el.innerHTML=skel(2);
@@ -901,10 +917,12 @@ async function muatAdmin(){
       '<button class="btn blok" data-aksi="simpanAI">Simpan pengaturan AI</button>'+(p.aiAktif?'<button class="btn alt blok" data-aksi="hapusKunciAI" style="margin-top:8px">Hapus kunci</button>':'')+'<div class="pesan hidden" id="pesanAI"></div></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">🔑 Kode pendaftaran</div><div class="meta">Bagikan ke pegawai yang boleh membuat akun.</div>'+
       '<div style="font-size:30px;font-weight:800;letter-spacing:5px;color:var(--pri);margin:8px 0" id="kodeDaftar">'+esc(p.kode)+'</div><button class="btn alt sm" data-aksi="gantiKode">Buat kode baru</button></div>'+
-      '<div class="card"><div class="judul" style="margin-top:0">👥 Pengguna ('+us.length+')</div>'+us.map(function(x){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)"><div><b>'+esc(x.nama)+'</b><div class="meta">@'+esc(x.username)+(x.jabatan?' • '+esc(x.jabatan):'')+'</div></div>'+
-        '<button class="btn alt sm" data-aksi="peran" data-id="'+x.id+'" data-peran="'+(x.peran==='admin'?'petugas':'admin')+'">'+(x.peran==='admin'?'Admin ✓':'Jadikan admin')+'</button></div>';
-      }).join('')+'</div>';
+      '<div class="card"><div class="judul" style="margin-top:0">👥 Pengguna ('+us.length+')</div><div class="hint" style="margin-top:0">Petugas hanya melihat data miliknya dan data akun lain yang <b>bidangnya sama</b>. Akun tanpa bidang hanya melihat datanya sendiri. Admin melihat semuanya.</div>'+(S.pengguna={},us.map(function(x){
+        S.pengguna[x.id]=x;
+        return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)"><div><b>'+esc(x.nama)+'</b><div class="meta">@'+esc(x.username)+(x.jabatan?' • '+esc(x.jabatan):'')+'</div>'+
+        '<div class="chips" style="margin:4px 0 0"><span class="chip '+esc(x.peran)+'">'+(x.peran==='admin'?'Admin':'Petugas')+'</span><span class="chip">'+(x.bidang?esc(x.bidang):'Bidang belum diisi')+'</span></div></div>'+
+        '<button class="btn alt sm" data-aksi="editUser" data-id="'+x.id+'">'+ic('edit',16)+'Edit</button></div>';
+      }).join(''))+'</div>';
   }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
 }
 function pk(id,ok,t){ var p=$(id); if(!p) return; p.className='pesan '+(ok?'ok':'gagal'); p.textContent=t; }
@@ -1104,6 +1122,10 @@ var AKSI={
   gantiPw:async function(b){ loading(b,'Menyimpan…'); try{ await api('gantiPassword',$('pwLama').value,$('pwBaru').value); $('pwLama').value=''; $('pwBaru').value=''; pk('pesanPw',true,'Password diganti.'); }catch(e){ pk('pesanPw',false,e.message); } selesai(b); },
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
   gantiKode:async function(b){ loading(b,'…'); try{ var k=await api('gantiKodeDaftar'); $('kodeDaftar').textContent=k; toast('Kode baru dibuat'); }catch(e){ toast(e.message); } selesai(b); },
+  editUser:function(b){ formEditUser(b.dataset.id); },
+  simpanUser:async function(b){ loading(b,'Menyimpan…'); try{ await api('ubahPengguna',b.dataset.id,{nama:$('uNama').value,nip:$('uNip').value,jabatan:$('uJab').value,bidang:$('uBid').value,peran:$('uPeran').value}); if(b.dataset.id===S.user.id){ S.user=(await api('saya')).user; } tutupLembar(); toast('Akun diperbarui ✅'); muatAdmin(); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
+  resetPwUser:async function(b){ loading(b,'…'); try{ await api('resetPasswordPengguna',b.dataset.id,$('uPw').value); selesai(b); $('uPw').value=''; pk('pesanUser',true,'Password baru sudah diatur. Akun itu perlu masuk ulang.'); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
+  hapusUser:async function(b){ if(!window.confirm('Hapus akun ini? Laporan yang pernah dibuatnya tetap tersimpan (hanya admin yang melihat).')) return; loading(b,'Menghapus…'); try{ await api('hapusPengguna',b.dataset.id); tutupLembar(); toast('Akun dihapus'); muatAdmin(); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
   peran:async function(b){ loading(b,'…'); try{ await api('ubahPeran',b.dataset.id,b.dataset.peran); muatAdmin(); }catch(e){ toast(e.message); selesai(b); } },
   resetForm:resetForm,
   menuReset:function(){
