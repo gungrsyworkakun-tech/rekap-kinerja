@@ -217,7 +217,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='3.5';
+var KLIEN_VERSI='3.6';
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
 var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
@@ -332,11 +332,12 @@ var JENIS={
   {k:'mengetahui',t:'select',l:'Tambahkan tanda tangan "Mengetahui"',opts:['Ya','Tidak'],def:'Ya'},
   {t:'foto'}]},
  nota:{nama:'Nota Dinas',judul:'Nota Dinas',ket:'Nota dinas ke atasan',ik:'send',warna:'#0f8f8f',fields:[
-  {k:'nomor',t:'text',l:'Nomor (opsional)'},
-  {k:'kepada',t:'text',l:'Yth.'},{k:'dari',t:'text',l:'Dari'},
-  {k:'hal',t:'text',l:'Hal',w:1,ph:'mis. Laporan pemeliharaan server'},
-  {k:'tanggal',t:'date',l:'Tanggal',w:1,half:1},{k:'lampiran',t:'text',l:'Lampiran',half:1,ph:'mis. 1 berkas'},
-  {k:'isi',t:'area',l:'Isi nota dinas',w:1,rows:8},
+  {k:'nomor',t:'text',l:'Nomor surat',ph:'mis. WIM.20.IMI.1/UM.01.01/705/2026'},
+  {k:'kepada',t:'text',l:'Yth. (penerima)'},{k:'dari',t:'text',l:'Dari'},
+  {k:'hal',t:'text',l:'Hal',w:1,ph:'mis. Hari Libur dalam rangka Hari Raya Suci Pagerwesi'},
+  {k:'lampiran',t:'text',l:'Lampiran',half:1,ph:'mis. 1 (satu) berkas'},{k:'tanggal',t:'date',l:'Tanggal',w:1,half:1},
+  {k:'isi',t:'area',l:'Isi nota dinas',w:1,rows:9,ph:'Pisahkan paragraf dengan baris kosong. Tebal: **teks**'},
+  {k:'ttdNama',t:'text',l:'Nama penandatangan'},
   {k:'tembusan',t:'area',l:'Tembusan (satu per baris)',rows:2},
   {t:'foto'}]},
  pemeliharaan:{nama:'Pemeliharaan Rutin',judul:'Laporan Pemeliharaan Rutin',ket:'Daftar periksa perangkat berkala',ik:'tool',warna:'#d68a14',fields:[
@@ -422,6 +423,7 @@ function formDok(jenis,x,tanpaDraf){
     if(f.t==='date') return h.tgl;
     if(jenis==='nota'&&f.k==='kepada') return s.kepada||'';
     if(jenis==='nota'&&f.k==='dari') return s.jabatanTtd||'';
+    if(jenis==='nota'&&f.k==='ttdNama') return s.namaTtd||'';
     return f.def||'';
   }
   function lab(f){ return '<label>'+esc(f.l)+(f.w?' <i>*</i>':'')+'</label>'; }
@@ -590,9 +592,11 @@ function teksWA(x){
     t=t.concat(['','Demikian Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.']);
     if(d.mengetahui==='Ya') t=t.concat(['','Mengetahui,'].concat(ttd));
   } else if(x.jenis==='nota'){
-    t=[B('NOTA DINAS'),d.nomor?'Nomor: '+d.nomor:'','','Yth. : '+(d.kepada||s.kepada),'Dari : '+(d.dari||s.jabatanTtd),'Hal : '+d.hal,'Tanggal : '+tglIndo(d.tanggal),d.lampiran?'Lampiran : '+d.lampiran:'','',pr(d.isi)];
+    var nb=String(d.nomor||'').trim(), isi=pr(d.isi).replace(/\*\*(.+?)\*\*/g,'*$1*');
+    if(!/demikian/i.test(isi.split('\n').pop())) isi+=(isi?'\n\n':'')+'Demikian disampaikan, atas perhatiannya diucapkan terima kasih.';
+    t=[B('NOTA DINAS'),nb?(/^nomor/i.test(nb)?nb.toUpperCase():'NOMOR '+nb):'','','Yth.     : '+(d.kepada||s.kepada),'Dari     : '+(d.dari||s.jabatanTtd),'Hal      : '+d.hal,d.lampiran?'Lampiran : '+d.lampiran:'','Tanggal  : '+tglIndo(d.tanggal),'',isi];
     if(pr(d.tembusan)) t=t.concat(['','Tembusan:',pr(d.tembusan)]);
-    t=t.concat(['',d.dari||s.jabatanTtd,'','Ttd.','',s.namaTtd]);
+    t=t.concat(['',d.dari||s.jabatanTtd,'','Ttd.','',d.ttdNama||s.namaTtd]);
   } else {
     var ck=(d.checklist||[]).map(function(c,i){ return (i+1)+'. '+c.item+' — '+c.hasil+(c.ket?' ('+c.ket+')':''); }).join('\n');
     t=[B('LAPORAN PEMELIHARAAN RUTIN'),'Kepada Yth. '+s.kepada,'','Dengan hormat, bersama ini kami laporkan pelaksanaan pemeliharaan rutin sebagai berikut:','',B('I. KEGIATAN'),'Pemeliharaan rutin '+d.kategori,'',
