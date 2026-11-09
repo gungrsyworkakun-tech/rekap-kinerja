@@ -222,7 +222,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='4.1';
+var KLIEN_VERSI='4.2';
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
 var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
@@ -930,7 +930,7 @@ async function muatAdmin(){
 async function muatBackup(){
   try{
     var b=await api('statusBackup'), el=$('infoBackup'); if(!el) return; S.bk=b;
-    el.innerHTML='Salinan seluruh data disimpan di Google Drive, folder <b>Backup Rekap Kerja</b> ('+b.simpan+' terakhir disimpan).<br>Backup terakhir: <b>'+(b.terakhir?new Date(b.terakhir).toLocaleString('id-ID'):'belum pernah')+'</b>'+(b.url?'<br><a href="'+esc(b.url)+'" target="_blank" rel="noopener">Buka folder backup</a>':'');
+    el.innerHTML='Disimpan di Google Drive, folder <b>Backup Rekap Kerja</b>: salinan seluruh data ('+b.simpan+' terakhir) dan semua laporan sebagai file <b>PDF + Word</b> (folder Laporan).<br>Backup terakhir: <b>'+(b.terakhir?new Date(b.terakhir).toLocaleString('id-ID'):'belum pernah')+'</b>'+(b.url?'<br><a href="'+esc(b.url)+'" target="_blank" rel="noopener">Buka folder backup</a>':'');
     $('btnOto').textContent=b.otomatis?'Backup harian: AKTIF (tekan untuk matikan)':'Aktifkan backup otomatis tiap hari';
   }catch(e){ var el2=$('infoBackup'); if(el2) el2.textContent=e.message; }
 }
@@ -1131,7 +1131,7 @@ var AKSI={
   gantiPw:async function(b){ loading(b,'Menyimpan…'); try{ await api('gantiPassword',$('pwLama').value,$('pwBaru').value); $('pwLama').value=''; $('pwBaru').value=''; pk('pesanPw',true,'Password diganti.'); }catch(e){ pk('pesanPw',false,e.message); } selesai(b); },
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
   gantiKode:async function(b){ loading(b,'…'); try{ var k=await api('gantiKodeDaftar'); $('kodeDaftar').textContent=k; toast('Kode baru dibuat'); }catch(e){ toast(e.message); } selesai(b); },
-  backupNow:async function(b){ loading(b,'Membuat backup…'); try{ await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil disimpan di Drive.'); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
+  backupNow:async function(b){ loading(b,'Membuat backup…'); try{ var r=await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil: '+r.laporanBaru+' laporan baru disimpan sebagai file.'+(r.laporanSisa?' Masih ada '+r.laporanSisa+' laporan, tekan lagi untuk melanjutkan.':'')); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
   backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: tiap hari sekitar jam 02.00–03.00.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
   editUser:function(b){ formEditUser(b.dataset.id); },
   simpanUser:async function(b){ loading(b,'Menyimpan…'); try{ await api('ubahPengguna',b.dataset.id,{nama:$('uNama').value,nip:$('uNip').value,jabatan:$('uJab').value,bidang:$('uBid').value,peran:$('uPeran').value}); if(b.dataset.id===S.user.id){ S.user=(await api('saya')).user; } tutupLembar(); toast('Akun diperbarui ✅'); muatAdmin(); }catch(e){ selesai(b); pk('pesanUser',false,e.message); } },
