@@ -113,6 +113,15 @@
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   button{touch-action:manipulation}
   @media (max-width:359px){.g2{grid-template-columns:minmax(0,1fr)}.tile{padding:12px}}
+
+  .pw{position:relative}.pw input{padding-right:50px}
+  .pw .mata{position:absolute;right:4px;top:0;bottom:0;width:46px;border:0;background:none;color:var(--mut);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .card.doc{cursor:pointer}
+  .dt{margin:0 0 12px}.dt .k{font-size:13px;font-weight:700;color:var(--mut);margin:0 0 3px}.dt .v{font-size:15.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .dt .v.kosong2{color:var(--mut)}
+  .dt .rows div{padding:8px 0;border-top:1px solid var(--line)}.dt .rows div:first-child{border-top:0}
+  .dt .rows small{display:block;color:var(--mut);font-size:13px}
+  .dt .galeri2{display:flex;flex-direction:column;gap:10px}.dt .galeri2 img{width:100%;border-radius:14px;border:1px solid var(--line)}
   .hint{font-size:13px;color:var(--mut);margin-top:5px}
   .pesan{margin-top:12px;padding:12px 14px;border-radius:12px;font-size:15px}
   .pesan.gagal{background:#fde6e3;color:var(--bad)} .pesan.ok{background:#e1f5ec;color:var(--ok)}
@@ -220,6 +229,8 @@ var ICON={
  clip:'<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
  user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+ eye:'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+ eyeoff:'<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
  x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
  dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
  more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
@@ -680,7 +691,7 @@ function kartuDok(x){
   var J=JENIS[x.jenis]||JENIS.laptensi, d=x.data, w='';
   if(d.tempat||d.lokasi) w='<div class="meta">'+ic('pin',15)+esc(d.tempat||d.lokasi)+'</div>';
   var pet=(d.petugas||[]), ch=pet.slice(0,3).map(function(p){ return '<span class="chip">'+esc(p)+'</span>'; }).join('')+(pet.length>3?'<span class="chip">+'+(pet.length-3)+'</span>':'');
-  return '<div class="card doc" style="--wr:'+J.warna+'"><span class="badge">'+ic(J.ik,13)+esc(J.nama)+'</span>'+
+  return '<div class="card doc" data-aksi="detail" data-id="'+x.id+'" style="--wr:'+J.warna+'"><span class="badge">'+ic(J.ik,13)+esc(J.nama)+'</span>'+
     '<p class="judul">'+esc(x.judul)+'</p><div class="meta">'+ic('cal',15)+esc(tglIndo(x.tanggal))+(d.jamMulai?' • '+esc(jamTitik(d.jamMulai)):'')+'</div>'+w+
     (ch?'<div class="chips">'+ch+'</div>':'')+
     '<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b></div>'+
@@ -799,6 +810,53 @@ async function boot(){
 }
 
 /* ================= Aksi ================= */
+/* ================= Detail laporan ================= */
+function nilaiDetail(f,v){
+  if(v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length)) return '<div class="v kosong2">-</div>';
+  if(f.t==='date') return '<div class="v">'+esc(tglIndo(v))+'</div>';
+  if(f.t==='time') return '<div class="v">'+esc(jamTitik(v))+'</div>';
+  if(f.t==='checklist'&&Array.isArray(v)) return '<div class="rows">'+v.map(function(c){ return '<div><b>'+esc(c.item)+'</b>: '+esc(c.hasil)+(c.ket?'<small>'+esc(c.ket)+'</small>':'')+'</div>'; }).join('')+'</div>';
+  if(Array.isArray(v)){
+    if(v.length&&typeof v[0]==='object') return '<div class="rows">'+v.map(function(o){ return '<div>'+Object.keys(o).map(function(k){ return esc(o[k]); }).filter(Boolean).join(' — ')+'</div>'; }).join('')+'</div>';
+    return '<div class="chips">'+v.map(function(p){ return '<span class="chip">'+esc(p)+'</span>'; }).join('')+'</div>';
+  }
+  return '<div class="v">'+esc(v)+'</div>';
+}
+function lihatDetail(id){
+  var x=S.dok[id]; if(!x) return;
+  var J=JENIS[x.jenis]||JENIS.laptensi, d=x.data||{};
+  var h='<div class="card flat"><span class="badge" style="--wr:'+J.warna+'">'+ic(J.ik,13)+esc(J.judul)+'</span>'+
+    '<p class="judul" style="margin:10px 0 14px">'+esc(x.judul)+'</p>';
+  J.fields.forEach(function(f){
+    if(!f.k) return;
+    var v=d[f.k]; if(f.k==='tanggal') v=v||x.tanggal;
+    h+='<div class="dt"><p class="k">'+esc(f.l)+'</p>'+nilaiDetail(f,v)+'</div>';
+  });
+  h+='<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b></div>';
+  if(x.fotoIds&&x.fotoIds.length) h+='<div class="dt" style="margin-top:14px"><p class="k">Foto dokumentasi ('+x.fotoIds.length+')</p><div class="galeri2" id="galDt"><div class="kosong"><span class="spin g"></span></div></div></div>';
+  h+='</div><button class="btn blok" data-aksi="bagi" data-id="'+id+'" style="margin-top:0">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
+    (x.bisaUbah?'<button class="btn alt blok" data-aksi="ubahDok" data-id="'+id+'">'+ic('edit',18)+'Ubah laporan</button>':'');
+  bukaLembar('Detail laporan',h);
+  if(x.fotoIds&&x.fotoIds.length){
+    var g=$('galDt'); g.innerHTML='';
+    x.fotoIds.reduce(function(pr,fid,i){ return pr.then(function(){
+      return api('ambilFoto',fid).then(function(u){ var im=document.createElement('img'); im.src=u; g.appendChild(im); },
+        function(e){ var q=document.createElement('div'); q.className='pesan gagal'; q.textContent='Foto '+(i+1)+' gagal dimuat'; g.appendChild(q); });
+    }); },Promise.resolve());
+  }
+}
+
+/* ================= Lihat / sembunyikan password ================= */
+function pasangMata(){
+  document.querySelectorAll('input[type=password]:not([data-mata])').forEach(function(i){
+    i.dataset.mata='1';
+    var w=document.createElement('div'); w.className='pw'; i.parentNode.insertBefore(w,i); w.appendChild(i);
+    var b=document.createElement('button'); b.type='button'; b.className='mata'; b.setAttribute('aria-label','Lihat password'); b.dataset.aksi='mata'; b.innerHTML=ic('eye',20); w.appendChild(b);
+  });
+}
+try{ new MutationObserver(pasangMata).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+document.addEventListener('DOMContentLoaded',pasangMata);
+
 var AKSI={
   segAuth:function(b){ var m=b.dataset.t==='masuk'; $('segMasuk').classList.toggle('on',m); $('segDaftar').classList.toggle('on',!m); $('formMasuk').classList.toggle('hidden',!m); $('formDaftar').classList.toggle('hidden',m); pesanAuth(''); },
   masuk:async function(b){ pesanAuth(''); loading(b,'Masuk…'); try{ var r=await call('masuk',[$('lUser').value,$('lPass').value]); S.token=r.token; S.user=r.user; simpanToken(r.token); $('lPass').value=''; tampilApp(); }catch(e){ pesanAuth(e.message); } selesai(b); },
@@ -808,6 +866,8 @@ var AKSI={
   baru:function(b){ if(b.dataset.j==='kegiatan') formKeg(); else formDok(b.dataset.j); },
   tutup:tutupLembar,
   fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); muatDok(); },
+  detail:function(b){ lihatDetail(b.dataset.id); },
+  mata:function(b){ var i=b.parentNode.querySelector('input'); var tampil=i.type==='password'; i.type=tampil?'text':'password'; b.innerHTML=ic(tampil?'eyeoff':'eye',20); b.setAttribute('aria-label',tampil?'Sembunyikan password':'Lihat password'); },
   foto:function(b){ lihatFoto(b.dataset.ids.split(',')); },
   bagi:function(b){ menuBagi(b.dataset.id); },
   lihatDaftar:function(){ tutupLembar(); go('dok'); },
