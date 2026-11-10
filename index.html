@@ -258,9 +258,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.4';
+var KLIEN_VERSI='5.5';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='4.2';
+var KLIEN_BUTUH='5.1';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -1179,7 +1179,7 @@ function kartuDok(x){
 /* ================= Kegiatan harian ================= */
 function halKeg(){
   judul('Rekap kerja harian','Kegiatan');
-  $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Waktu</div>'+fwHtml('keg')+'</div>'+kotakCari('keg','Cari kegiatan: nama, kategori, petugas…')+
+  $('isiHal').innerHTML='<button class="btn alt blok" style="margin:0 0 10px" data-aksi="lapHarian">'+ic('clip',18)+'Laporan harian + link</button><div class="card" style="padding:12px"><div class="fw-judul">Waktu</div>'+fwHtml('keg')+'</div>'+kotakCari('keg','Cari kegiatan: nama, kategori, petugas…')+
     '<div class="stat" style="grid-template-columns:repeat(3,1fr)"><div><b id="tK">–</b><span>Kegiatan</span></div><div><b id="tV">–</b><span>Volume</span></div><div><b id="tF">–</b><span>Foto</span></div></div><div id="daftarKeg" style="margin-top:12px"></div>';
   fwPasang('keg',muatKeg); pasangCari('keg',renderKeg); muatKeg();
 }
@@ -1259,6 +1259,73 @@ function halAkun(){
     '<button class="btn danger blok" data-aksi="keluar">'+ic('out',18)+'Keluar</button>';
   if(u.peran==='admin') muatAdmin();
 }
+
+/* ================= Laporan kegiatan harian + link ================= */
+var LAP={ttd:null};
+function lapPilihOrang(id,judul,tanpa){
+  var t=LAP.ttd, o='';
+  if(tanpa) o+='<option value="-">(Tanpa penanda tangan)</option>';
+  if(t.bawaan&&t.bawaan.nama) o+='<option value="b">Pejabat di Pengaturan: '+esc(t.bawaan.nama)+'</option>';
+  t.pengguna.forEach(function(p,i){ o+='<option value="u'+i+'">'+esc(p.nama)+(p.jabatan?' — '+esc(p.jabatan):'')+'</option>'; });
+  o+='<option value="m">Ketik sendiri…</option>';
+  return '<label>'+judul+'</label><select id="'+id+'" class="lapSel" data-m="'+id+'M">'+o+'</select>'+
+    '<div id="'+id+'M" class="hidden" style="margin-top:6px"><input id="'+id+'N" placeholder="Nama lengkap"><div class="g2"><input id="'+id+'P" placeholder="NIP"><input id="'+id+'J" placeholder="Jabatan"></div></div>';
+}
+function lapAmbilOrang(id){
+  var v=$(id).value, t=LAP.ttd;
+  if(v==='-') return null;
+  if(v==='b') return t.bawaan;
+  if(v==='m') return {nama:$(id+'N').value.trim(),nip:$(id+'P').value.trim(),jabatan:$(id+'J').value.trim()};
+  return t.pengguna[Number(v.slice(1))]||null;
+}
+function lapUrl(x){ return (API_URL||x.url)+'?lap='+x.token; }
+async function bukaLaporanHarian(){
+  bukaLembar('Laporan kegiatan harian','<div class="kosong"><span class="spin g"></span></div>');
+  try{ LAP.ttd=await api('daftarPenandatangan'); }catch(e){ LAP.ttd={pengguna:[],bawaan:{nama:'',nip:'',jabatan:''}}; }
+  var h=hariIni();
+  bukaLembar('Laporan kegiatan harian','<div class="card flat">'+
+    '<div class="g2"><div><label style="margin-top:0">Dari tanggal</label><input type="date" id="lpDari" value="'+h.tgl+'"></div><div><label style="margin-top:0">Sampai tanggal</label><input type="date" id="lpSampai" value="'+h.tgl+'"></div></div>'+
+    '<div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn alt sm" data-aksi="lapRentang" data-r="hari">Hari ini</button><button class="btn alt sm" data-aksi="lapRentang" data-r="minggu">7 hari terakhir</button><button class="btn alt sm" data-aksi="lapRentang" data-r="bulan">Bulan ini</button></div>'+
+    '<label>Judul tambahan (boleh dikosongkan)</label><input id="lpJudul" placeholder="mis. Minggu ke-2 November">'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:10px 0 0;font-weight:500;font-size:13.5px"><input type="checkbox" id="lpRekan" style="width:auto;margin:0"> Sertakan kegiatan rekan satu bidang</label>'+
+    lapPilihOrang('lpPel','Pelapor (yang membuat laporan)',false)+lapPilihOrang('lpMgt','Mengetahui (atasan)',true)+
+    '<div class="hint">Link bisa dibuka siapa saja yang memegangnya, tanpa login, dan berlaku 90 hari. Kamu bisa menghapusnya kapan saja.</div></div>'+
+    '<button class="btn blok" id="btnLap" data-aksi="lapBuat" style="margin-top:0">Buat laporan &amp; link</button><div class="pesan gagal hidden" id="pesanLap"></div><div id="lapHasil"></div>'+
+    '<div class="judul">Link yang sudah dibuat</div><div id="lapDaftar"><div class="kosong"><span class="spin g"></span></div></div>');
+  var iPel=-1; LAP.ttd.pengguna.forEach(function(p,i){ if(p.nama===S.user.nama) iPel=i; });
+  if(iPel>=0) $('lpPel').value='u'+iPel; else { $('lpPel').value='m'; $('lpPelM').classList.remove('hidden'); $('lpPelN').value=S.user.nama; $('lpPelP').value=S.user.nip||''; $('lpPelJ').value=S.user.jabatan||''; }
+  $('lpMgt').value=(LAP.ttd.bawaan&&LAP.ttd.bawaan.nama)?'b':'-';
+  lapMuatDaftar();
+}
+async function lapMuatDaftar(){
+  var el=$('lapDaftar'); if(!el) return;
+  try{
+    var l=await api('daftarTautan');
+    if(!$('lapDaftar')) return;
+    $('lapDaftar').innerHTML=l.length?l.map(function(x){
+      var u=lapUrl(x), per=x.dari===x.sampai?x.dari:x.dari+' s.d. '+x.sampai;
+      return '<div class="card" style="padding:12px"><b>'+esc(per)+'</b>'+(x.judul?'<div class="meta">'+esc(x.judul)+'</div>':'')+'<div class="meta">Dibuat '+esc(x.dibuat)+(x.aktif?'':' · <span style="color:var(--bad)">kedaluwarsa</span>')+'</div>'+
+        '<div class="row" style="margin-top:8px;flex-wrap:wrap"><a class="btn alt sm" style="text-decoration:none" href="'+esc(u)+'" target="_blank" rel="noopener">Buka</a><button class="btn alt sm" data-aksi="lapSalin" data-u="'+esc(u)+'">Salin link</button><button class="btn alt sm" data-aksi="lapWa" data-u="'+esc(u)+'" data-p="'+esc(per)+'">WhatsApp</button><button class="btn danger sm" data-aksi="lapHapus" data-t="'+esc(x.token)+'">Hapus</button></div></div>';
+    }).join(''):'<div class="hint">Belum ada link.</div>';
+  }catch(e){ if($('lapDaftar')) $('lapDaftar').innerHTML='<div class="hint">Daftar link gagal dimuat: '+esc(e.message)+'</div>'; }
+}
+function lapTeksWa(u,per){ return 'Laporan Kegiatan Harian ('+per+')\n'+u; }
+async function lapBuat(b){
+  var pe=$('pesanLap'); pe.classList.add('hidden');
+  var pel=lapAmbilOrang('lpPel'), mgt=lapAmbilOrang('lpMgt');
+  if(!pel||!pel.nama){ pe.textContent='Isi nama pelapor dulu.'; pe.classList.remove('hidden'); return; }
+  if($('lpMgt').value==='m'&&(!mgt||!mgt.nama)){ pe.textContent='Isi nama pada bagian "Mengetahui", atau pilih "Tanpa penanda tangan".'; pe.classList.remove('hidden'); return; }
+  loading(b,'Membuat…');
+  try{
+    var r=await api('buatTautanLaporan',{dari:$('lpDari').value,sampai:$('lpSampai').value,judul:$('lpJudul').value,rekan:$('lpRekan').checked,pembuat:pel,mengetahui:mgt});
+    var u=lapUrl(r), per=$('lpDari').value===$('lpSampai').value?$('lpDari').value:$('lpDari').value+' s.d. '+$('lpSampai').value;
+    $('lapHasil').innerHTML='<div class="card" style="border:2px solid var(--ok)"><div class="judul" style="margin-top:0">✅ Link laporan siap</div><div class="meta" style="word-break:break-all;margin-bottom:8px">'+esc(u)+'</div>'+
+      '<div class="row" style="flex-wrap:wrap"><a class="btn sm" style="text-decoration:none" href="'+esc(u)+'" target="_blank" rel="noopener">Buka laporan</a><button class="btn alt sm" data-aksi="lapSalin" data-u="'+esc(u)+'">Salin link</button><button class="btn alt sm" data-aksi="lapWa" data-u="'+esc(u)+'" data-p="'+esc(per)+'">Kirim WhatsApp</button></div></div>';
+    lapMuatDaftar();
+  }catch(e){ pe.textContent=e.message; pe.classList.remove('hidden'); }
+  selesai(b);
+}
+$('ls').addEventListener('change',function(e){ var t=e.target; if(t&&t.classList&&t.classList.contains('lapSel')){ var m=$(t.dataset.m); if(m) m.classList.toggle('hidden',t.value!=='m'); } });
 
 /* ================= Pasang sebagai aplikasi (PWA) ================= */
 var tundaPasang=null;
@@ -1470,6 +1537,15 @@ var AKSI={
   go:function(b){ go(b.dataset.t); },
   fab:function(){ if(S.tab==='dok') menuBaru(); else formKeg(); },
   kamGps:function(){ bukaKameraGps(); },
+  lapHarian:function(){ bukaLaporanHarian(); },
+  lapBuat:lapBuat,
+  lapRentang:function(b){ var d=new Date(), z=function(n){return String(n).padStart(2,'0');}, f=function(x){ return x.getFullYear()+'-'+z(x.getMonth()+1)+'-'+z(x.getDate()); }, r=b.dataset.r, a=new Date(d);
+    if(r==='minggu') a.setDate(a.getDate()-6); else if(r==='bulan') a=new Date(d.getFullYear(),d.getMonth(),1);
+    $('lpDari').value=f(a); $('lpSampai').value=f(d); },
+  lapSalin:function(b){ salinTeks(b.dataset.u); },
+  lapWa:function(b){ window.open(waLink(lapTeksWa(b.dataset.u,b.dataset.p)),'_blank'); },
+  lapHapus:async function(b){ if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected){ delete b.dataset.sure; b.textContent='Hapus'; } },3500); return; }
+    loading(b,'…'); try{ await api('hapusTautan',b.dataset.t); toast('Link dihapus'); lapMuatDaftar(); }catch(e){ selesai(b); toast(e.message); } },
   baru:function(b){ if(b.dataset.j==='kegiatan') formKeg(); else formDok(b.dataset.j); },
   tutup:tutupLembar,
   fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); renderDok(); },
