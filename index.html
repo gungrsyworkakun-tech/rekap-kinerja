@@ -258,9 +258,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.6';
+var KLIEN_VERSI='5.7';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='5.2';
+var KLIEN_BUTUH='5.3';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -670,7 +670,7 @@ function bisaDiulang(m){ return /lock|kunci|timeout|waktu|menghubungi|HTTP 5|too
 async function kirimAman(nama,data,btn){
   var kali=3, e0;
   for(var n=1;n<=kali;n++){
-    try{ return await api(nama,data); }
+    try{ return await api.apply(null,[nama].concat(Array.isArray(data)?data:[data])); }
     catch(e){ e0=e; if(n>=kali||!bisaDiulang(e.message)) throw e; if(btn) btn.innerHTML='<span class="spin"></span>Mencoba lagi ('+(n+1)+'/'+kali+')…'; await new Promise(function(r){ setTimeout(r,1500*n); }); }
   }
   throw e0;
@@ -1200,7 +1200,7 @@ function kartuDok(x){
     '<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b>'+(x.bidang&&S.user.peran==='admin'?' • '+esc(x.bidang):'')+'</div>'+
     '<div class="acts"><button class="btn" data-aksi="bagi" data-id="'+x.id+'">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
     (x.fotoIds.length?'<button class="btn alt ico" data-aksi="foto" data-ids="'+x.fotoIds.join(',')+'" aria-label="Foto">'+ic('img',19)+'</button>':'')+
-    (x.bisaUbah?'<button class="btn alt ico" data-aksi="menuDok" data-id="'+x.id+'" aria-label="Lainnya">'+ic('more',19)+'</button>':'')+'</div></div>';
+    '</div>'+(x.bisaUbah?'<div class="acts" style="margin-top:8px"><button class="btn ghost" data-aksi="ubahDok" data-id="'+x.id+'">'+ic('edit',17)+'Ubah</button><button class="btn ghost" style="color:var(--bad)" data-aksi="hapusDokKartu" data-id="'+x.id+'">'+ic('trash',17)+'Hapus</button></div>':'')+'</div>';
 }
 
 /* ================= Kegiatan harian ================= */
@@ -1236,22 +1236,24 @@ function kartuKeg(x){
     '<div class="chips">'+(x.kategori?'<span class="chip">'+esc(x.kategori)+'</span>':'')+'<span class="chip '+esc(x.status)+'">'+esc(x.status)+'</span>'+(x.volume?'<span class="chip">'+esc(x.volume)+' '+esc(x.satuan)+'</span>':'')+'</div>'+
     (x.detail?'<div class="isi">'+esc(x.detail)+'</div>':'')+(x.catatan?'<div class="catatan">'+esc(x.catatan)+'</div>':'')+
     '<div class="oleh">Diinput oleh <b>'+esc(x.petugas)+'</b>'+(x.bidang&&S.user.peran==='admin'?' • '+esc(x.bidang):'')+'</div>'+
-    ((x.fotoIds.length||x.bisaUbah)?'<div class="acts">'+(x.bisaUbah?'<button class="btn ghost" data-aksi="ubahKeg" data-id="'+x.id+'">'+ic('edit',17)+'Catatan / status / foto</button>':'')+
+    ((x.fotoIds.length||x.bisaUbah)?'<div class="acts">'+(x.bisaUbah?'<button class="btn ghost" data-aksi="ubahKeg" data-id="'+x.id+'">'+ic('edit',17)+'Ubah</button><button class="btn ghost" style="color:var(--bad)" data-aksi="hapusKeg" data-id="'+x.id+'">'+ic('trash',17)+'Hapus</button>':'')+
     (x.fotoIds.length?'<button class="btn alt ico" data-aksi="foto" data-ids="'+x.fotoIds.join(',')+'">'+ic('img',19)+'</button>':'')+'</div>':'')+'</div>';
 }
 var fotoKeg=null, idKeg=null;
-function formKeg(){
-  kegDasar=null;
+function formKeg(x){
+  kegDasar=null; idKeg=x?x.id:null;
   var h=hariIni();
-  bukaLembar('Tambah kegiatan','<div class="card flat"><div class="g2"><div><label style="margin-top:0">Tanggal <i>*</i></label><input type="date" id="kTgl" value="'+h.tgl+'"></div><div><label style="margin-top:0">Jam</label><input type="time" id="kJam" value="'+h.jam+'"></div></div>'+
+  bukaLembar(x?'Ubah kegiatan':'Tambah kegiatan','<div class="card flat"><div class="g2"><div><label style="margin-top:0">Tanggal <i>*</i></label><input type="date" id="kTgl" value="'+h.tgl+'"></div><div><label style="margin-top:0">Jam</label><input type="time" id="kJam" value="'+h.jam+'"></div></div>'+
     '<label>Nama kegiatan <i>*</i></label><input id="kNama" placeholder="mis. Pemeriksaan CCTV Terminal Kedatangan">'+
     '<label>Kategori</label><input id="kKat" list="dlKat" placeholder="Pilih atau ketik"><datalist id="dlKat"><option>Pelayanan</option><option>Pemeriksaan</option><option>Pemeliharaan</option><option>Administrasi</option><option>Rapat / Koordinasi</option><option>Pelatihan</option><option>Lainnya</option></datalist>'+
     '<label>Detail kinerja</label><textarea id="kDet" placeholder="Apa yang dikerjakan, hasil, kendala"></textarea>'+
     '<div class="g2"><div><label>Jumlah / volume</label><input type="number" id="kVol" min="0" step="any" inputmode="decimal"></div><div><label>Satuan</label><input id="kSat" list="dlSat" placeholder="unit / dokumen"><datalist id="dlSat"><option>unit</option><option>orang</option><option>dokumen</option><option>laporan</option><option>kegiatan</option></datalist></div></div>'+
     '<label>Status</label><select id="kStat"><option>Selesai</option><option>Proses</option><option>Tertunda</option></select>'+
-    '<label>Catatan</label><textarea id="kCat" style="min-height:64px"></textarea><label>Foto dokumentasi</label><div id="kFoto"></div></div>'+
-    '<button class="btn blok" id="btnKeg" data-aksi="simpanKeg" style="margin-top:0">Simpan kegiatan</button><div class="pesan gagal hidden" id="pesanKeg"></div>');
-  fotoKeg=pemilihFoto($('kFoto'),10,'keg');
+    '<label>Catatan</label><textarea id="kCat" style="min-height:64px"></textarea><label>'+(x?'Tambah foto':'Foto dokumentasi')+'</label><div id="kFoto"></div>'+
+    (x&&x.fotoIds.length?'<label style="display:flex;align-items:center;gap:8px;margin:10px 0 0;font-weight:500;font-size:13.5px"><input type="checkbox" id="kHapusFoto" style="width:auto;margin:0"> Hapus '+x.fotoIds.length+' foto lama</label>':'')+'</div>'+
+    '<button class="btn blok" id="btnKeg" data-aksi="'+(x?'simpanUbahKeg':'simpanKeg')+'" style="margin-top:0">'+(x?'Simpan perubahan':'Simpan kegiatan')+'</button><div class="pesan gagal hidden" id="pesanKeg"></div>');
+  fotoKeg=pemilihFoto($('kFoto'),10,x?null:'keg');
+  if(x){ $('kTgl').value=x.tanggal; $('kJam').value=x.jam||''; $('kNama').value=x.kegiatan; $('kKat').value=x.kategori||''; $('kDet').value=x.detail||''; $('kVol').value=x.volume||''; $('kSat').value=x.satuan||''; $('kStat').value=x.status||'Selesai'; $('kCat').value=x.catatan||''; }
 }
 var kegDasar=null;
 async function simpanKeg(btn){
@@ -1267,18 +1269,16 @@ async function simpanKeg(btn){
   try{ fdTulis('keg',[]); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }catch(e){}
   if(r&&r.fotoGagal) setTimeout(function(){ toast('Kegiatan tersimpan, tapi foto gagal disimpan ke Drive: '+r.fotoGagal); },700);
 }
-function formUbahKeg(id){
-  var x=S.keg[id]; idKeg=id;
-  bukaLembar('Perbarui kegiatan','<div class="card flat"><div class="judul" style="margin-top:0">'+esc(x.kegiatan)+'</div>'+
-    '<label>Status</label><select id="eStat"><option>Selesai</option><option>Proses</option><option>Tertunda</option></select>'+
-    '<label>Tambah catatan</label><textarea id="eCat" placeholder="Catatan baru ditambahkan di bawah catatan lama"></textarea><label>Tambah foto</label><div id="eFoto"></div></div>'+
-    '<button class="btn blok" id="btnEdit" data-aksi="simpanUbahKeg" style="margin-top:0">Simpan perubahan</button><div class="pesan gagal hidden" id="pesanEdit"></div>');
-  $('eStat').value=x.status||'Selesai'; fotoKeg=pemilihFoto($('eFoto'),10);
-}
+function formUbahKeg(id){ formKeg(S.keg[id]); }
 async function simpanUbahKeg(btn){
-  var pe=$('pesanEdit'); pe.classList.add('hidden'); loading(btn,'Menyimpan…');
-  try{ await api('perbaruiKegiatan',idKeg,{status:$('eStat').value,catatanBaru:$('eCat').value,foto:fotoKeg.kirim()}); tutupLembar(); toast('Diperbarui ✅'); muatKeg(); }
-  catch(e){ selesai(btn); pe.textContent=e.message; pe.classList.remove('hidden'); }
+  var pe=$('pesanKeg'); pe.classList.add('hidden');
+  var d={tanggal:$('kTgl').value,jam:$('kJam').value,kegiatan:$('kNama').value,kategori:$('kKat').value,detail:$('kDet').value,volume:$('kVol').value,satuan:$('kSat').value,status:$('kStat').value,catatan:$('kCat').value,foto:fotoKeg.kirim(),hapusFotoLama:!!($('kHapusFoto')&&$('kHapusFoto').checked)};
+  if(!d.tanggal||!String(d.kegiatan).trim()){ tampilGalat(pe,'Tanggal dan nama kegiatan wajib diisi.'); return; }
+  loading(btn,d.foto.length?'Mengunggah foto…':'Menyimpan…');
+  var r;
+  try{ r=await kirimAman('ubahKegiatan',[idKeg,d],btn); }catch(e){ selesai(btn); tampilGalat(pe,'Belum tersimpan: '+e.message); return; }
+  try{ tutupLembar(); toast('Kegiatan diperbarui ✅'); muatKeg(); }catch(e){}
+  if(r&&r.fotoGagal) setTimeout(function(){ toast('Tersimpan, tapi foto gagal disimpan ke Drive: '+r.fotoGagal); },700);
 }
 
 /* ================= Akun ================= */
@@ -1543,7 +1543,7 @@ function lihatDetail(id){
   h+='<div class="oleh">Diinput oleh <b>'+esc(x.pembuat)+'</b></div>';
   if(x.fotoIds&&x.fotoIds.length) h+='<div class="dt" style="margin-top:14px"><p class="k">Foto dokumentasi ('+x.fotoIds.length+')</p><div class="galeri2" id="galDt"><div class="kosong"><span class="spin g"></span></div></div></div>';
   h+='</div><button class="btn wa blok" data-aksi="siapWAteks" data-id="'+id+'" style="margin-top:0">'+ic('chat',18)+'Kirim teks + foto ke WhatsApp</button><button class="btn alt blok" data-aksi="siapWA" data-id="'+id+'" style="margin-top:0">'+ic('file',18)+'Kirim PDF + foto ke WhatsApp</button><button class="btn alt blok" data-aksi="bagi" data-id="'+id+'" style="margin-top:0">'+ic('dl',18)+'Unduh &amp; bagikan</button>'+
-    (x.bisaUbah?'<button class="btn alt blok" data-aksi="ubahDok" data-id="'+id+'">'+ic('edit',18)+'Ubah laporan</button>':'');
+    (x.bisaUbah?'<button class="btn alt blok" data-aksi="ubahDok" data-id="'+id+'">'+ic('edit',18)+'Ubah laporan</button><button class="btn danger blok" data-aksi="hapusDokKartu" data-id="'+id+'">'+ic('trash',18)+'Hapus laporan</button>':'');
   bukaLembar('Detail laporan',h);
   if(x.fotoIds&&x.fotoIds.length){
     var g=$('galDt'); g.innerHTML='';
@@ -1653,6 +1653,18 @@ var AKSI={
   simpanDok:simpanDok,
   simpanKeg:simpanKeg,
   ubahKeg:function(b){ formUbahKeg(b.dataset.id); },
+  hapusKeg:async function(b){
+    if(!b.dataset.sure){ b.dataset.sure='1'; b.dataset.h0=b.innerHTML; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected&&b.dataset.sure){ delete b.dataset.sure; b.innerHTML=b.dataset.h0; } },3500); return; }
+    delete b.dataset.sure; b.disabled=true; b.textContent='Menghapus…';
+    try{ await api('hapusKegiatan',b.dataset.id); toast('Kegiatan dihapus'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }
+    catch(e){ b.disabled=false; b.innerHTML=b.dataset.h0||'Hapus'; toast(e.message); }
+  },
+  hapusDokKartu:async function(b){
+    if(!b.dataset.sure){ b.dataset.sure='1'; b.dataset.h0=b.innerHTML; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected&&b.dataset.sure){ delete b.dataset.sure; b.innerHTML=b.dataset.h0; } },3500); return; }
+    delete b.dataset.sure; b.disabled=true; b.textContent='Menghapus…';
+    try{ await api('hapusDokumen',b.dataset.id); try{ tutupLembar(); }catch(e){} toast('Laporan dihapus'); if(S.tab==='dok') muatDok(); else halHome(); }
+    catch(e){ b.disabled=false; b.innerHTML=b.dataset.h0||'Hapus'; toast(e.message); }
+  },
   simpanUbahKeg:simpanUbahKeg,
   pasangApp:function(){ pasangApp(); },
   simpanProfil:async function(b){ loading(b,'Menyimpan…'); try{ S.user=await api('perbaruiProfil',{nama:$('pNama').value,nip:$('pNip').value,jabatan:$('pJab').value}); $('avatar').textContent=S.user.nama.charAt(0).toUpperCase(); pk('pesanProfil',true,'Profil tersimpan.'); }catch(e){ pk('pesanProfil',false,e.message); } selesai(b); },
