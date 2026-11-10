@@ -6,6 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b2a5b">
 <title>Rekap Kerja</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rekap Kerja">
 <style>
   :root{
     --bg:#f2f5fb;--card:#ffffff;--tx:#131a2b;--mut:#667089;--line:#e4e9f3;--inp:#ffffff;
@@ -253,7 +258,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.2';
+var KLIEN_VERSI='5.3';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -1223,9 +1228,29 @@ function halAkun(){
     '<button class="btn blok" data-aksi="simpanProfil">Simpan profil</button><div class="pesan hidden" id="pesanProfil"></div></div>'+
     '<div class="card"><div class="judul" style="margin-top:0">Ganti password</div><label style="margin-top:6px">Password lama</label><input type="password" id="pwLama"><label>Password baru</label><input type="password" id="pwBaru">'+
     '<button class="btn alt blok" data-aksi="gantiPw">Ganti password</button><div class="pesan hidden" id="pesanPw"></div></div><div id="adminArea"></div>'+
+    '<div class="card"><div class="judul" style="margin-top:0">📲 Pasang sebagai aplikasi</div><div class="meta" style="margin-bottom:10px" id="infoPasang">'+infoPasang()+'</div><button class="btn alt blok" style="margin-top:0" data-aksi="pasangApp">Pasang aplikasi</button></div>'+
     '<div class="card"><div class="judul" style="margin-top:0">Reset data</div><div class="meta" style="margin-bottom:10px">Pilih sendiri yang mau dihapus: draf, laporan per jenis, atau kegiatan.</div><button class="btn danger blok" style="margin-top:0" data-aksi="menuReset">Reset data…</button></div>'+
     '<button class="btn danger blok" data-aksi="keluar">'+ic('out',18)+'Keluar</button>';
   if(u.peran==='admin') muatAdmin();
+}
+
+/* ================= Pasang sebagai aplikasi (PWA) ================= */
+var tundaPasang=null;
+window.addEventListener('beforeinstallprompt',function(e){ e.preventDefault(); tundaPasang=e; });
+window.addEventListener('appinstalled',function(){ tundaPasang=null; });
+function sudahTerpasang(){ return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true; }
+function infoPasang(){
+  if(sudahTerpasang()) return 'Kamu sedang memakai versi aplikasi. Kalau ada pembaruan, otomatis terpakai saat dibuka dengan internet.';
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent)) return 'Di iPhone: ketuk tombol Bagikan (kotak panah) di Safari, lalu pilih <b>Tambah ke Layar Utama</b>.';
+  return 'Pasang di layar utama HP seperti aplikasi biasa. Pembaruan kode otomatis, tidak perlu pasang ulang.';
+}
+function pasangApp(){
+  if(sudahTerpasang()){ toast('Sudah terpasang sebagai aplikasi'); return; }
+  if(tundaPasang){ tundaPasang.prompt(); tundaPasang=null; return; }
+  toast(/iphone|ipad|ipod/i.test(navigator.userAgent)?'Ketuk Bagikan → Tambah ke Layar Utama':'Buka menu ⋮ browser → Pasang aplikasi / Tambahkan ke layar utama');
+}
+if('serviceWorker' in navigator && API_URL && /^https:/.test(location.protocol) && !/script\.google|googleusercontent/.test(location.hostname)){
+  window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{r.update();}catch(e){} }).catch(function(){}); });
 }
 
 function formEditUser(id){
@@ -1492,6 +1517,7 @@ var AKSI={
   simpanKeg:simpanKeg,
   ubahKeg:function(b){ formUbahKeg(b.dataset.id); },
   simpanUbahKeg:simpanUbahKeg,
+  pasangApp:function(){ pasangApp(); },
   simpanProfil:async function(b){ loading(b,'Menyimpan…'); try{ S.user=await api('perbaruiProfil',{nama:$('pNama').value,nip:$('pNip').value,jabatan:$('pJab').value}); $('avatar').textContent=S.user.nama.charAt(0).toUpperCase(); pk('pesanProfil',true,'Profil tersimpan.'); }catch(e){ pk('pesanProfil',false,e.message); } selesai(b); },
   gantiPw:async function(b){ loading(b,'Menyimpan…'); try{ await api('gantiPassword',$('pwLama').value,$('pwBaru').value); $('pwLama').value=''; $('pwBaru').value=''; pk('pesanPw',true,'Password diganti.'); }catch(e){ pk('pesanPw',false,e.message); } selesai(b); },
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
