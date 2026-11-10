@@ -20,3 +20,4 @@ self.addEventListener('fetch',function(e){
     }).catch(function(){ return caches.match(r).then(function(m){ return m||caches.match('./index.html'); }); })
   );
 });
+
