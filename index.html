@@ -133,6 +133,10 @@
   .pesan.gagal{background:#fde6e3;color:var(--bad)} .pesan.ok{background:#e1f5ec;color:var(--ok)}
   .kosong{text-align:center;color:var(--mut);padding:34px 12px}
   .kosong svg{opacity:.5;margin-bottom:8px}
+  #topbar{position:fixed;top:0;left:0;right:0;height:3px;z-index:95;overflow:hidden;opacity:0;transition:opacity .25s;pointer-events:none}
+  #topbar.on{opacity:1}
+  #topbar::before{content:'';position:absolute;top:0;bottom:0;left:0;width:35%;background:linear-gradient(90deg,transparent,#4f8cff,#7bb0ff,transparent);animation:geser 1s infinite ease-in-out}
+  @keyframes geser{from{transform:translateX(-100%)}to{transform:translateX(300%)}}
   .skel{height:112px;border-radius:var(--r);margin-bottom:12px;background:linear-gradient(90deg,var(--line) 25%,color-mix(in srgb,var(--line) 50%,transparent) 50%,var(--line) 75%);background-size:200% 100%;animation:kilau 1.2s infinite}
   @keyframes kilau{to{background-position:-200% 0}}
 
@@ -196,6 +200,7 @@
 </style>
 </head>
 <body>
+<div id="topbar"></div>
 
 <!-- ============ MASUK / DAFTAR ============ -->
 <div id="auth" class="hidden">
@@ -242,7 +247,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.0';
+var KLIEN_VERSI='5.1';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -297,7 +302,13 @@ function simpanToken(t){ try{ if(t) localStorage.setItem('rk_token',t); else loc
 function ambilToken(){ try{ return localStorage.getItem('rk_token'); }catch(e){ return null; } }
 function toast(t){ var el=$('toast'); el.textContent=t; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t=setTimeout(function(){ el.classList.add('hidden'); },2800); }
 
+var BEBAN=0;
+function beban(n){ BEBAN=Math.max(0,BEBAN+n); var t=document.getElementById('topbar'); if(t) t.classList.toggle('on',BEBAN>0); }
 function call(nama,args){
+  beban(1);
+  return call0(nama,args).then(function(r){ beban(-1); return r; },function(e){ beban(-1); throw e; });
+}
+function call0(nama,args){
   return new Promise(function(res,rej){
     if(!(window.google&&google.script&&google.script.run)){
       if(!API_URL){ rej(new Error('API_URL belum diisi di Index.html')); return; }
@@ -327,7 +338,22 @@ function call(nama,args){
     r[nama].apply(r,args);
   });
 }
-function api(nama){ return call(nama,[S.token].concat([].slice.call(arguments,1))); }
+/* ---- Cache tampilan: tampilkan data tersimpan dulu, perbarui di belakang ---- */
+function cKey(n,args){ return 'rkc:'+(S.user?S.user.id:'')+':'+n+':'+JSON.stringify(args); }
+function cBaca(k){ try{ var t=localStorage.getItem(k); return t?JSON.parse(t):null; }catch(e){ return null; } }
+function cBersih(){ try{ Object.keys(localStorage).filter(function(k){ return k.indexOf('rkc:')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} }
+function cTulis(k,d){ try{ localStorage.setItem(k,JSON.stringify(d)); }catch(e){ cBersih(); } }
+function swr(n,args,tampil){
+  var k=cKey(n,args), lama=cBaca(k), punya=lama!==null;
+  if(punya) tampil(lama,true);
+  return api.apply(null,[n].concat(args)).then(function(d){ cTulis(k,d); tampil(d,false); return d; },function(e){ if(!punya) throw e; toast('Tidak bisa memperbarui, menampilkan data tersimpan'); });
+}
+var TULIS=/^(simpanKegiatan|simpanDokumen|perbarui|hapus|ubah|reset|masuk|daftar)/;
+function api(nama){
+  var p=call(nama,[S.token].concat([].slice.call(arguments,1)));
+  if(TULIS.test(nama)) p.then(cBersih,function(){});
+  return p;
+}
 function loading(b,t){ b.disabled=true; b.dataset.h=b.innerHTML; b.innerHTML='<span class="spin"></span>'+t; }
 function selesai(b){ b.disabled=false; if(b.dataset.h) b.innerHTML=b.dataset.h; }
 function skel(n){ var s=''; for(var i=0;i<(n||3);i++) s+='<div class="skel"></div>'; return s; }
@@ -983,12 +1009,15 @@ function halHome(){
   $('isiHal').innerHTML='<div class="stat"><div><b id="sDok">–</b><span>Laporan bulan ini</span></div><div><b id="sKeg">–</b><span>Kegiatan bulan ini</span></div></div>'+
     '<h3 class="sec">Buat baru</h3><div class="menu">'+tiles+'</div><h3 class="sec">Laporan terbaru</h3><div id="terbaru">'+skel(2)+'</div>';
   var b=hariIni().bulan;
-  Promise.all([api('ambilDokumen',b),api('ambilKegiatan',b)]).then(function(r){
-    S.dok={}; r[0].forEach(function(x){ S.dok[x.id]=x; });
-    if(S.tab!=='home') return;
-    $('sDok').textContent=r[0].length; $('sKeg').textContent=r[1].length;
-    $('terbaru').innerHTML=r[0].length?r[0].slice(0,4).map(kartuDok).join(''):'<div class="kosong">Belum ada laporan bulan ini.<br>Pilih salah satu menu di atas untuk mulai.</div>';
-  }).catch(function(e){ if($('terbaru')) $('terbaru').innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; });
+  var idH=S.idHome=(S.idHome||0)+1, hDok=null, hKeg=null;
+  function gambarHome(){
+    if(idH!==S.idHome||S.tab!=='home'||hDok===null||hKeg===null||!$('terbaru')) return;
+    S.dok={}; hDok.forEach(function(x){ S.dok[x.id]=x; });
+    $('sDok').textContent=hDok.length; $('sKeg').textContent=hKeg.length;
+    $('terbaru').innerHTML=hDok.length?hDok.slice(0,4).map(kartuDok).join(''):'<div class="kosong">Belum ada laporan bulan ini.<br>Pilih salah satu menu di atas untuk mulai.</div>';
+  }
+  swr('ambilDokumen',[b],function(d){ hDok=d; gambarHome(); }).catch(function(e){ if(idH===S.idHome&&$('terbaru')) $('terbaru').innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; });
+  swr('ambilKegiatan',[b],function(d){ hKeg=d; gambarHome(); }).catch(function(){});
 }
 
 /* ================= Laporan ================= */
@@ -1057,12 +1086,16 @@ function halDok(){
 }
 async function muatDok(){
   var el=$('daftarDok'); if(!el) return;
-  el.innerHTML=skel(3);
+  var id=S.idDok=(S.idDok||0)+1, arg=fwArg('dok');
+  if(cBaca(cKey('ambilDokumen',[arg]))===null) el.innerHTML=skel(3);
   try{
-    var data=await api('ambilDokumen',fwArg('dok')); S.dok={}; data.forEach(function(x){ S.dok[x.id]=x; });
-    var tampil=data.filter(function(x){ return !S.fJenis||x.jenis===S.fJenis; });
-    el.innerHTML=tampil.length?tampil.map(kartuDok).join(''):'<div class="kosong">'+ic('file',40)+'<br>Belum ada laporan untuk '+fwTeks('dok')+'.<br>Tekan <b>Buat laporan</b>.</div>';
-  }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
+    await swr('ambilDokumen',[arg],function(data){
+      var e2=$('daftarDok'); if(id!==S.idDok||!e2) return;
+      S.dok={}; data.forEach(function(x){ S.dok[x.id]=x; });
+      var tampil=data.filter(function(x){ return !S.fJenis||x.jenis===S.fJenis; });
+      e2.innerHTML=tampil.length?tampil.map(kartuDok).join(''):'<div class="kosong">'+ic('file',40)+'<br>Belum ada laporan untuk '+fwTeks('dok')+'.<br>Tekan <b>Buat laporan</b>.</div>';
+    });
+  }catch(e){ var e3=$('daftarDok'); if(id===S.idDok&&e3) e3.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
 }
 function kartuDok(x){
   var J=JENIS[x.jenis]||JENIS.laptensi, d=x.data, w='';
@@ -1086,13 +1119,17 @@ function halKeg(){
 }
 async function muatKeg(){
   var el=$('daftarKeg'); if(!el) return;
-  el.innerHTML=skel(3);
+  var id=S.idKeg=(S.idKeg||0)+1, arg=fwArg('keg');
+  if(cBaca(cKey('ambilKegiatan',[arg]))===null) el.innerHTML=skel(3);
   try{
-    var data=await api('ambilKegiatan',fwArg('keg')); S.keg={}; var v=0,f=0;
-    data.forEach(function(x){ S.keg[x.id]=x; v+=x.volume; f+=x.fotoIds.length; });
-    $('tK').textContent=data.length; $('tV').textContent=Math.round(v*100)/100; $('tF').textContent=f;
-    el.innerHTML=data.length?data.map(kartuKeg).join(''):'<div class="kosong">'+ic('clip',40)+'<br>Belum ada kegiatan untuk '+fwTeks('keg')+'.</div>';
-  }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
+    await swr('ambilKegiatan',[arg],function(data){
+      var e2=$('daftarKeg'); if(id!==S.idKeg||!e2) return;
+      S.keg={}; var v=0,f=0;
+      data.forEach(function(x){ S.keg[x.id]=x; v+=x.volume; f+=x.fotoIds.length; });
+      $('tK').textContent=data.length; $('tV').textContent=Math.round(v*100)/100; $('tF').textContent=f;
+      e2.innerHTML=data.length?data.map(kartuKeg).join(''):'<div class="kosong">'+ic('clip',40)+'<br>Belum ada kegiatan untuk '+fwTeks('keg')+'.</div>';
+    });
+  }catch(e){ var e3=$('daftarKeg'); if(id===S.idKeg&&e3) e3.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
 }
 function kartuKeg(x){
   return '<div class="card doc" style="--wr:#12805c"><span class="badge">'+ic('clip',13)+'Kegiatan</span><p class="judul">'+esc(x.kegiatan)+'</p>'+
@@ -1223,7 +1260,7 @@ async function tampilApp(){
   call('versi',[]).then(function(v){ if(vBanding(v,KLIEN_BUTUH)<0) peringatVersi(); },peringatVersi);
 }
 function peringatVersi(){ var b=$('verBar'); if(b) b.innerHTML='<div class="banner" style="margin:0;color:#3a2c00"><span>⚠️ <b>Kode server belum diperbarui.</b> Tempel Code.gs terbaru di Apps Script, jalankan <b>mulaiPertama</b>, lalu <b>Deploy → New version</b>. Sebelum itu, sebagian tombol bisa gagal.</span></div>'; }
-function keluarLokal(){ S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
+function keluarLokal(){ cBersih(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
 async function boot(){
   var t=ambilToken(); if(!t){ tampilAuth(); return; }
   S.token=t; try{ var r=await api('saya'); S.user=r.user; tampilApp(); }catch(e){ keluarLokal(); }
