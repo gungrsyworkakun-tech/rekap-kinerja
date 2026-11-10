@@ -258,7 +258,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.3';
+var KLIEN_VERSI='5.4';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -463,11 +463,29 @@ function kompres(file){
     img.src=url;
   });
 }
-function pemilihFoto(wadah,maks){
+/* Foto sementara disimpan di HP (IndexedDB) supaya tidak hilang kalau formulir tertutup tanpa sengaja */
+var FD={db:null};
+function fdBuka(){ return new Promise(function(res){ if(FD.db) return res(FD.db); try{ var r=indexedDB.open('rkFoto',1); r.onupgradeneeded=function(){ r.result.createObjectStore('f'); }; r.onsuccess=function(){ FD.db=r.result; res(FD.db); }; r.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }
+function fdKunci(k){ return (S.user?S.user.id:'')+'|'+k; }
+function fdTulis(k,items){ fdBuka().then(function(db){ if(!db) return; try{ var o=db.transaction('f','readwrite').objectStore('f'); if(items&&items.length) o.put(items.map(function(i){ return {data:i.data,preview:i.preview}; }),fdKunci(k)); else o.delete(fdKunci(k)); }catch(e){} }); }
+function fdBaca(k){ return fdBuka().then(function(db){ return new Promise(function(res){ if(!db) return res(null); try{ var q=db.transaction('f').objectStore('f').get(fdKunci(k)); q.onsuccess=function(){ res(q.result||null); }; q.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }); }
+function fdSemua(){ fdBuka().then(function(db){ if(db) try{ db.transaction('f','readwrite').objectStore('f').clear(); }catch(e){} }); }
+function kamSimpanOn(){ try{ return localStorage.getItem('kamSimpan')!=='0'; }catch(e){ return true; } }
+function galeriFile(file){
+  var n=new Date(), z=function(x){ return ('0'+x).slice(-2); };
+  var nama='Foto_'+n.getFullYear()+z(n.getMonth()+1)+z(n.getDate())+'_'+z(n.getHours())+z(n.getMinutes())+z(n.getSeconds())+'_'+Math.floor(Math.random()*90+10)+'.jpg';
+  var f=new File([file],nama,{type:'image/jpeg'});
+  if(kgIOS()){ try{ if(navigator.canShare&&navigator.canShare({files:[f]})) return navigator.share({files:[f]}).catch(function(){}); }catch(e){} return Promise.resolve(); }
+  var u=URL.createObjectURL(f), a=document.createElement('a'); a.href=u; a.download=nama; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(u); },4000);
+  return Promise.resolve();
+}
+function pemilihFoto(wadah,maks,kunci){
   var st={items:[]};
   wadah.innerHTML='<div class="row"><button type="button" class="btn alt sm" data-p="g">'+ic('img',17)+'Galeri</button><button type="button" class="btn alt sm" data-p="k">'+ic('cam',17)+'Kamera</button><button type="button" class="btn alt sm" data-p="gps">'+ic('pin',17)+'Kamera GPS</button></div>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:8px 0 0;font-weight:500;font-size:13px"><input type="checkbox" class="ks" style="width:auto;margin:0"> Simpan foto dari Kamera ke galeri HP</label>'+
     '<input type="file" accept="image/*" multiple hidden class="pg"><input type="file" accept="image/*" capture="environment" hidden class="pk"><div class="thumbs"></div><div class="hint"></div>';
   var pg=wadah.querySelector('.pg'), pk=wadah.querySelector('.pk'), th=wadah.querySelector('.thumbs'), hint=wadah.querySelector('.hint');
+  var ks=wadah.querySelector('.ks'); ks.checked=kamSimpanOn(); ks.onchange=function(){ try{ localStorage.setItem('kamSimpan',ks.checked?'1':'0'); }catch(e){} };
   wadah.querySelector('[data-p="g"]').onclick=function(){ pg.click(); };
   wadah.querySelector('[data-p="k"]').onclick=function(){ pk.click(); };
   wadah.querySelector('[data-p="gps"]').onclick=function(){ bukaKameraGps(function(it){ if(st.items.length<maks){ st.items.push(it); gambar(); } else toast('Maksimal '+maks+' foto'); }); };
@@ -478,14 +496,21 @@ function pemilihFoto(wadah,maks){
       im.src=f.preview; b.type='button'; b.textContent='×'; b.onclick=function(){ st.items.splice(i,1); gambar(); };
       d.appendChild(im); d.appendChild(b); th.appendChild(d);
     });
-    hint.textContent=st.items.length?st.items.length+' foto baru (maks '+maks+')':'';
+    hint.textContent=st.items.length?st.items.length+' foto baru (maks '+maks+')'+(kunci?' · tersimpan sementara di HP':''):'';
+    if(kunci&&st.siap) fdTulis(kunci,st.items);
   }
   async function baca(inp){
-    for(var i=0;i<inp.files.length;i++){ if(st.items.length>=maks) break; try{ st.items.push(await kompres(inp.files[i])); }catch(e){} }
-    inp.value=''; gambar();
+    var asli=[]; for(var i=0;i<inp.files.length;i++){ if(st.items.length>=maks) break; try{ st.items.push(await kompres(inp.files[i])); asli.push(inp.files[i]); }catch(e){} }
+    var dariKamera=(inp===pk); inp.value=''; gambar();
+    if(dariKamera&&ks.checked) asli.forEach(function(f){ galeriFile(f); });
   }
   pg.onchange=function(){ baca(pg); }; pk.onchange=function(){ baca(pk); };
   st.kirim=function(){ return st.items.map(function(f){ return {data:f.data}; }); };
+  st.siap=!kunci;
+  if(kunci) fdBaca(kunci).then(function(it){
+    if(it&&it.length&&wadah.isConnected&&!st.items.length){ st.items=it.slice(0,maks); toast(st.items.length+' foto dari formulir tadi dipulihkan'); }
+    st.siap=true; gambar();
+  });
   return st;
 }
 async function lihatFoto(ids){
@@ -540,7 +565,7 @@ function formDok(jenis,x,tanpaDraf){
   }
   html+='</div><div class="row"><button class="btn alt blok" id="btnSimpan" data-aksi="simpanDok" data-b="0">Simpan</button><button class="btn blok" id="btnSimpanBagi" data-aksi="simpanDok" data-b="1">Simpan &amp; bagikan</button></div><div class="pesan gagal hidden" id="pesanForm"></div>'+(x?'':'<div class="row" style="justify-content:space-between;align-items:center;margin-top:12px"><div class="hint" id="drafInfo" style="margin:0">Draf tersimpan otomatis</div><button class="btn sm alt" data-aksi="resetForm">Reset formulir</button></div>');
   bukaLembar((x?'Ubah ':'Buat ')+J.nama,html);
-  F.foto=pemilihFoto($('lFoto'),10);
+  F.foto=pemilihFoto($('lFoto'),10,x?null:'dok:'+jenis);
   gambarTags(); gambarCk(); gambarBg();
   if(!x&&!tanpaDraf) muatDraf();
 }
@@ -595,7 +620,7 @@ async function muatDraf(){
     var r=await api('ambilDraf',f.jenis);
     if(!r||F!==f||f.dirty) return;
     terapkanDraf(r.data);
-    var bar=$('drafBar'); if(bar) bar.innerHTML='<div class="banner"><span>📝 Draf terakhir dilanjutkan<br><small>disimpan '+esc(r.waktu)+' (foto perlu dipilih lagi)</small></span></div>';
+    var bar=$('drafBar'); if(bar) bar.innerHTML='<div class="banner"><span>📝 Draf terakhir dilanjutkan<br><small>disimpan'+esc(r.waktu)+'</small></span></div>';
   }catch(e){}
 }
 function terapkanDraf(d){
@@ -614,6 +639,7 @@ async function resetForm(b){
   if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected){ delete b.dataset.sure; b.textContent='Reset formulir'; } },3500); return; }
   var j=F.jenis; F.sudah=true; clearTimeout(F.timer);
   try{ await api('hapusDraf',j); }catch(e){}
+  fdTulis('dok:'+j,[]);
   formDok(j,null,true); toast('Formulir dikosongkan');
 }
 $('ls').addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.id==='lPetInput'){ e.preventDefault(); tambahPetugas(); } });
@@ -647,7 +673,7 @@ async function simpanDok(btn){
     var j=F.jenis;
     var r=await api('simpanDokumen',{id:F.id,jenis:j,data:k.data,foto:F.foto.kirim(),hapusFotoLama:!!($('lHapusFoto')&&$('lHapusFoto').checked)});
     F.sudah=true; clearTimeout(F.timer);
-    if(!F.id) api('hapusDraf',j).catch(function(){});
+    if(!F.id){ api('hapusDraf',j).catch(function(){}); fdTulis('dok:'+j,[]); }
     var baru=null; try{ baru=await api('ambilSatuDokumen',r.id); }catch(e){}
     if(!baru) baru={id:r.id,jenis:j,tanggal:k.data.tanggal,judul:String(k.data.kegiatan||k.data.judul||k.data.hal||JENIS[j].nama),data:k.data,fotoIds:[],pembuat:S.user.nama,dibuat:'',bisaUbah:true};
     S.dok[baru.id]=baru; (function(){ var f=fwGet('dok'); f.mode='bulan'; f.bulan=String(k.data.tanggal).slice(0,7); })(); S.fJenis='';
@@ -1197,13 +1223,13 @@ function formKeg(){
     '<label>Status</label><select id="kStat"><option>Selesai</option><option>Proses</option><option>Tertunda</option></select>'+
     '<label>Catatan</label><textarea id="kCat" style="min-height:64px"></textarea><label>Foto dokumentasi</label><div id="kFoto"></div></div>'+
     '<button class="btn blok" id="btnKeg" data-aksi="simpanKeg" style="margin-top:0">Simpan kegiatan</button><div class="pesan gagal hidden" id="pesanKeg"></div>');
-  fotoKeg=pemilihFoto($('kFoto'),10);
+  fotoKeg=pemilihFoto($('kFoto'),10,'keg');
 }
 async function simpanKeg(btn){
   var pe=$('pesanKeg'); pe.classList.add('hidden');
   var d={tanggal:$('kTgl').value,jam:$('kJam').value,kegiatan:$('kNama').value,kategori:$('kKat').value,detail:$('kDet').value,volume:$('kVol').value,satuan:$('kSat').value,status:$('kStat').value,catatan:$('kCat').value,foto:fotoKeg.kirim()};
   loading(btn,d.foto.length?'Mengunggah foto…':'Menyimpan…');
-  try{ await api('simpanKegiatan',d); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }
+  try{ await api('simpanKegiatan',d); fdTulis('keg',[]); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }
   catch(e){ selesai(btn); pe.textContent=e.message; pe.classList.remove('hidden'); }
 }
 function formUbahKeg(id){
@@ -1326,7 +1352,7 @@ async function tampilApp(){
   call('versi',[]).then(function(v){ if(vBanding(v,KLIEN_BUTUH)<0) peringatVersi(); },peringatVersi);
 }
 function peringatVersi(){ var b=$('verBar'); if(b) b.innerHTML='<div class="banner" style="margin:0;color:#3a2c00"><span>⚠️ <b>Kode server belum diperbarui.</b> Tempel Code.gs terbaru di Apps Script, jalankan <b>mulaiPertama</b>, lalu <b>Deploy → New version</b>. Sebelum itu, sebagian tombol bisa gagal.</span></div>'; }
-function keluarLokal(){ cBersih(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
+function keluarLokal(){ fdSemua(); cBersih(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
 async function boot(){
   var t=ambilToken(); if(!t){ tampilAuth(); return; }
   S.token=t; try{ var r=await api('saya'); S.user=r.user; tampilApp(); }catch(e){ keluarLokal(); }
