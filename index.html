@@ -258,9 +258,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.5';
+var KLIEN_VERSI='5.6';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='5.1';
+var KLIEN_BUTUH='5.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -615,12 +615,13 @@ function simpanDrafSekarang(){
   return api('simpanDraf',f.jenis,k.data).then(function(){ infoDraf('Draf tersimpan otomatis ✓'); },function(){ infoDraf('Draf belum tersimpan'); });
 }
 async function muatDraf(){
-  var f=F;
+  var f=F, lok=bacaGagal(f.jenis);
+  if(lok){ terapkanDraf(lok); var bar0=$('drafBar'); if(bar0) bar0.innerHTML='<div class="banner"><span>⚠️ Isi terakhir yang belum berhasil tersimpan dipulihkan<br><small>periksa lalu tekan Simpan lagi</small></span></div>'; return; }
   try{
     var r=await api('ambilDraf',f.jenis);
     if(!r||F!==f||f.dirty) return;
     terapkanDraf(r.data);
-    var bar=$('drafBar'); if(bar) bar.innerHTML='<div class="banner"><span>📝 Draf terakhir dilanjutkan<br><small>disimpan'+esc(r.waktu)+'</small></span></div>';
+    var bar=$('drafBar'); if(bar) bar.innerHTML='<div class="banner"><span>📝 Draf terakhir dilanjutkan<br><small>disimpan '+esc(r.waktu)+'</small></span></div>';
   }catch(e){}
 }
 function terapkanDraf(d){
@@ -639,7 +640,7 @@ async function resetForm(b){
   if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected){ delete b.dataset.sure; b.textContent='Reset formulir'; } },3500); return; }
   var j=F.jenis; F.sudah=true; clearTimeout(F.timer);
   try{ await api('hapusDraf',j); }catch(e){}
-  fdTulis('dok:'+j,[]);
+  fdTulis('dok:'+j,[]); hapusGagal(j);
   formDok(j,null,true); toast('Formulir dikosongkan');
 }
 $('ls').addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target.id==='lPetInput'){ e.preventDefault(); tambahPetugas(); } });
@@ -662,17 +663,44 @@ function kumpul(){
   });
   return {data:d,salah:salah};
 }
+/* ================= Penyimpanan aman (coba ulang, tidak dobel, isi tidak hilang) ================= */
+function hash32(t){ var h=5381; for(var i=0;i<t.length;i++) h=((h<<5)+h+t.charCodeAt(i))|0; return (h>>>0).toString(36); }
+function kunciUnik(dasar,isi){ return (dasar||Math.random().toString(36).slice(2,10))+'-'+hash32(JSON.stringify(isi)); }
+function bisaDiulang(m){ return /lock|kunci|timeout|waktu|menghubungi|HTTP 5|too many|terlalu banyak|sibuk|server|bukan JSON|failed to fetch|network/i.test(m||'') && !/wajib|LOGIN|Sesi habis|tidak dikenal|belum ada di server/i.test(m||''); }
+async function kirimAman(nama,data,btn){
+  var kali=3, e0;
+  for(var n=1;n<=kali;n++){
+    try{ return await api(nama,data); }
+    catch(e){ e0=e; if(n>=kali||!bisaDiulang(e.message)) throw e; if(btn) btn.innerHTML='<span class="spin"></span>Mencoba lagi ('+(n+1)+'/'+kali+')…'; await new Promise(function(r){ setTimeout(r,1500*n); }); }
+  }
+  throw e0;
+}
+function kunciGagal(j){ return 'rkGagal_'+(S.user?S.user.id:'')+'_'+j; }
+function simpanGagal(j,data){ try{ localStorage.setItem(kunciGagal(j),JSON.stringify(data)); }catch(e){} }
+function bacaGagal(j){ try{ var t=localStorage.getItem(kunciGagal(j)); return t?JSON.parse(t):null; }catch(e){ return null; } }
+function hapusGagal(j){ try{ localStorage.removeItem(kunciGagal(j)); }catch(e){} }
+function tampilGalat(pe,m){ pe.textContent=m; pe.classList.remove('hidden'); try{ pe.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} toast(m.length>90?m.slice(0,88)+'…':m); }
+
 async function simpanDok(btn){
   var pe=$('pesanForm'); pe.classList.add('hidden');
   var sisa=$('lPetInput'); if(sisa&&sisa.value.trim()) tambahPetugas();
   var k=kumpul();
-  if(k.salah){ pe.textContent=k.salah; pe.classList.remove('hidden'); return; }
-  var bagi=btn.dataset.b==='1';
+  if(k.salah){ tampilGalat(pe,k.salah); return; }
+  var bagi=btn.dataset.b==='1', j=F.jenis, r;
   loading(btn,'Menyimpan…'); $('btnSimpan').disabled=true; $('btnSimpanBagi').disabled=true;
+  var foto=F.foto.kirim(), hapusLama=!!($('lHapusFoto')&&$('lHapusFoto').checked);
+  if(!F.kunciDasar) F.kunciDasar=Math.random().toString(36).slice(2,10);
   try{
-    var j=F.jenis;
-    var r=await api('simpanDokumen',{id:F.id,jenis:j,data:k.data,foto:F.foto.kirim(),hapusFotoLama:!!($('lHapusFoto')&&$('lHapusFoto').checked)});
-    F.sudah=true; clearTimeout(F.timer);
+    r=await kirimAman('simpanDokumen',{id:F.id,jenis:j,data:k.data,foto:foto,hapusFotoLama:hapusLama,kunciUnik:kunciUnik(F.kunciDasar,[k.data,foto.length,hapusLama])},btn);
+  }catch(e){
+    if(!F.id) simpanGagal(j,k.data);
+    selesai(btn); $('btnSimpan').disabled=false; $('btnSimpanBagi').disabled=false;
+    tampilGalat(pe,'Belum tersimpan: '+e.message+' — Isi laporan dan foto masih aman di HP. Tekan Simpan lagi.');
+    return;
+  }
+  /* sampai sini laporan SUDAH tersimpan di server; kesalahan tampilan di bawah tidak boleh dianggap gagal simpan */
+  try{
+    F.sudah=true; clearTimeout(F.timer); hapusGagal(j);
     if(!F.id){ api('hapusDraf',j).catch(function(){}); fdTulis('dok:'+j,[]); }
     var baru=null; try{ baru=await api('ambilSatuDokumen',r.id); }catch(e){}
     if(!baru) baru={id:r.id,jenis:j,tanggal:k.data.tanggal,judul:String(k.data.kegiatan||k.data.judul||k.data.hal||JENIS[j].nama),data:k.data,fotoIds:[],pembuat:S.user.nama,dibuat:'',bisaUbah:true};
@@ -680,9 +708,8 @@ async function simpanDok(btn){
     tutupLembar();
     if(bagi) menuBagi(baru.id,true); else konfirmasiSimpan(baru);
     if(S.tab==='dok') halDok(); else if(S.tab==='home') halHome();
-  }catch(e){
-    selesai(btn); $('btnSimpan').disabled=false; $('btnSimpanBagi').disabled=false; pe.textContent=e.message; pe.classList.remove('hidden');
-  }
+  }catch(e){ try{ tutupLembar(); }catch(x){} toast('Laporan sudah tersimpan. Buka tab Laporan untuk melihatnya.'); try{ go('dok'); }catch(x){} }
+  if(r&&r.fotoGagal) setTimeout(function(){ toast('Laporan tersimpan, tapi foto gagal disimpan ke Drive: '+r.fotoGagal); },600);
 }
 
 function konfirmasiSimpan(x){
@@ -1214,6 +1241,7 @@ function kartuKeg(x){
 }
 var fotoKeg=null, idKeg=null;
 function formKeg(){
+  kegDasar=null;
   var h=hariIni();
   bukaLembar('Tambah kegiatan','<div class="card flat"><div class="g2"><div><label style="margin-top:0">Tanggal <i>*</i></label><input type="date" id="kTgl" value="'+h.tgl+'"></div><div><label style="margin-top:0">Jam</label><input type="time" id="kJam" value="'+h.jam+'"></div></div>'+
     '<label>Nama kegiatan <i>*</i></label><input id="kNama" placeholder="mis. Pemeriksaan CCTV Terminal Kedatangan">'+
@@ -1225,12 +1253,19 @@ function formKeg(){
     '<button class="btn blok" id="btnKeg" data-aksi="simpanKeg" style="margin-top:0">Simpan kegiatan</button><div class="pesan gagal hidden" id="pesanKeg"></div>');
   fotoKeg=pemilihFoto($('kFoto'),10,'keg');
 }
+var kegDasar=null;
 async function simpanKeg(btn){
   var pe=$('pesanKeg'); pe.classList.add('hidden');
   var d={tanggal:$('kTgl').value,jam:$('kJam').value,kegiatan:$('kNama').value,kategori:$('kKat').value,detail:$('kDet').value,volume:$('kVol').value,satuan:$('kSat').value,status:$('kStat').value,catatan:$('kCat').value,foto:fotoKeg.kirim()};
+  if(!d.tanggal||!String(d.kegiatan).trim()){ tampilGalat(pe,'Tanggal dan nama kegiatan wajib diisi.'); return; }
   loading(btn,d.foto.length?'Mengunggah foto…':'Menyimpan…');
-  try{ await api('simpanKegiatan',d); fdTulis('keg',[]); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }
-  catch(e){ selesai(btn); pe.textContent=e.message; pe.classList.remove('hidden'); }
+  if(!kegDasar) kegDasar=Math.random().toString(36).slice(2,10);
+  var r;
+  try{ d.kunciUnik=kunciUnik(kegDasar,[d.tanggal,d.jam,d.kegiatan,d.kategori,d.detail,d.volume,d.satuan,d.status,d.catatan,d.foto.length]); r=await kirimAman('simpanKegiatan',d,btn); }
+  catch(e){ selesai(btn); tampilGalat(pe,'Belum tersimpan: '+e.message+' — Isian dan foto masih aman di HP. Tekan Simpan lagi.'); return; }
+  kegDasar=null;
+  try{ fdTulis('keg',[]); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }catch(e){}
+  if(r&&r.fotoGagal) setTimeout(function(){ toast('Kegiatan tersimpan, tapi foto gagal disimpan ke Drive: '+r.fotoGagal); },700);
 }
 function formUbahKeg(id){
   var x=S.keg[id]; idKeg=id;
