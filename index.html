@@ -70,6 +70,12 @@
 
   .chips-bar{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none}
   .chips-bar::-webkit-scrollbar{display:none}
+  .cari{position:relative;margin-bottom:12px}
+  .cari input{padding-left:42px;padding-right:42px}
+  .cari .ci{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--mut);display:flex;pointer-events:none}
+  .cari input[type=search]::-webkit-search-cancel-button,.cari input[type=search]::-webkit-search-decoration{-webkit-appearance:none;appearance:none;display:none}
+  .cari input[type=search]{-webkit-appearance:none;appearance:none}
+  .cari .cx{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--mut);width:38px;height:38px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer}
   .fc{flex:none;border:1px solid var(--line);background:var(--card);color:var(--mut);padding:9px 15px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
   .fc.on{background:var(--pri);color:#fff;border-color:var(--pri)}
   .bar{display:flex;gap:8px;margin-bottom:10px}
@@ -247,14 +253,14 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.1';
+var KLIEN_VERSI='5.2';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='4.2';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
 var API_URL='https://script.google.com/macros/s/AKfycbyILneHDSPFhgmPHX3tFNfMV79hEpTToT07ZuLNmZtUYrVlHXBNGg1B7fUim9IeRl0/exec';
-var S = { token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
+var S = { cari:{dok:'',keg:''}, dokData:[], kegData:[], token:null, user:null, set:{}, nama:[], tab:'home', dok:{}, keg:{}, fJenis:'', dokBulan:null, kegBulan:null, hasil:null };
 var BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 var HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 
@@ -285,6 +291,7 @@ var ICON={
  cal:'<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
  refresh:'<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
  pin:'<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
  word:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13l1.5 5 2.5-5 2.5 5L16 13"/>'
 };
@@ -1078,11 +1085,41 @@ function fwUlang(p){
   fwPasang(p,p==='dok'?muatDok:muatKeg);
 }
 
+/* ---- Pencarian ---- */
+function normCari(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function datar(v,out){ if(v==null) return out; if(typeof v==='object'){ Object.keys(v).forEach(function(k){ datar(v[k],out); }); } else out.push(String(v)); return out; }
+function cocok(x,q,fn){
+  q=normCari(q).split(/\s+/).filter(Boolean); if(!q.length) return true;
+  if(!x._c) Object.defineProperty(x,'_c',{value:normCari(fn(x)),enumerable:false,writable:true});
+  return q.every(function(w){ return x._c.indexOf(w)>=0; });
+}
+function teksCariDok(x){ return [x.judul,(JENIS[x.jenis]||{}).nama,x.tanggal,tglIndo(x.tanggal),x.pembuat,x.bidang].concat(datar(x.data,[])).join(' '); }
+function teksCariKeg(x){ return [x.kegiatan,x.kategori,x.status,x.detail,x.catatan,x.petugas,x.tanggal,tglIndo(x.tanggal),x.satuan,x.volume].join(' '); }
+function kotakCari(p,ph){
+  return '<div class="cari"><span class="ci">'+ic('search',20)+'</span><input type="search" id="cari_'+p+'" placeholder="'+ph+'" value="'+esc(S.cari[p])+'" autocomplete="off" autocapitalize="none" enterkeyhint="search">'+
+    '<button class="cx'+(S.cari[p]?'':' hidden')+'" id="cx_'+p+'" data-aksi="cariBersih" data-p="'+p+'" aria-label="Hapus pencarian">×</button></div>';
+}
+function pasangCari(p,render){
+  var el=$('cari_'+p); if(!el) return; var t;
+  el.oninput=function(){ S.cari[p]=el.value; var x=$('cx_'+p); if(x) x.classList.toggle('hidden',!el.value); clearTimeout(t); t=setTimeout(render,120); };
+}
+function kosongCari(p,teks){
+  var f=fwGet(p), semua=f.mode==='semua';
+  return '<div class="kosong">'+ic('search',40)+'<br>Tidak ada hasil untuk “'+esc(S.cari[p])+'”'+(semua?'':' pada '+fwTeks(p))+'.'+(semua?'':'<br><button class="btn alt sm" style="margin-top:10px" data-aksi="cariSemua" data-p="'+p+'">Cari di semua waktu</button>')+'</div>';
+}
 function halDok(){
   judul('Semua petugas','Laporan');
   var chips='<button class="fc'+(S.fJenis===''?' on':'')+'" data-aksi="fJenis" data-j="">Semua</button>'+URUT.map(function(k){ return '<button class="fc'+(S.fJenis===k?' on':'')+'" data-aksi="fJenis" data-j="'+k+'">'+esc(JENIS[k].nama)+'</button>'; }).join('');
-  $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Jenis laporan</div><div class="chips-bar" style="padding-bottom:12px">'+chips+'</div><div class="fw-judul">Waktu</div>'+fwHtml('dok')+'</div><div id="daftarDok"></div>';
-  fwPasang('dok',muatDok); muatDok();
+  $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Jenis laporan</div><div class="chips-bar" style="padding-bottom:12px">'+chips+'</div><div class="fw-judul">Waktu</div>'+fwHtml('dok')+'</div>'+kotakCari('dok','Cari laporan: judul, tempat, petugas, isi…')+'<div id="daftarDok"></div>';
+  fwPasang('dok',muatDok); pasangCari('dok',renderDok); muatDok();
+}
+function renderDok(){
+  var e2=$('daftarDok'); if(!e2) return;
+  var q=(S.cari.dok||'').trim(), data=(S.dokData||[]).filter(function(x){ return !S.fJenis||x.jenis===S.fJenis; });
+  var hasil=data.filter(function(x){ return cocok(x,q,teksCariDok); });
+  S.dok={}; (S.dokData||[]).forEach(function(x){ S.dok[x.id]=x; });
+  if(!hasil.length){ e2.innerHTML=q?kosongCari('dok'):'<div class="kosong">'+ic('file',40)+'<br>Belum ada laporan untuk '+fwTeks('dok')+'.<br>Tekan <b>Buat laporan</b>.</div>'; return; }
+  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' laporan</div>':'')+hasil.map(kartuDok).join('');
 }
 async function muatDok(){
   var el=$('daftarDok'); if(!el) return;
@@ -1091,9 +1128,7 @@ async function muatDok(){
   try{
     await swr('ambilDokumen',[arg],function(data){
       var e2=$('daftarDok'); if(id!==S.idDok||!e2) return;
-      S.dok={}; data.forEach(function(x){ S.dok[x.id]=x; });
-      var tampil=data.filter(function(x){ return !S.fJenis||x.jenis===S.fJenis; });
-      e2.innerHTML=tampil.length?tampil.map(kartuDok).join(''):'<div class="kosong">'+ic('file',40)+'<br>Belum ada laporan untuk '+fwTeks('dok')+'.<br>Tekan <b>Buat laporan</b>.</div>';
+      S.dokData=data; renderDok();
     });
   }catch(e){ var e3=$('daftarDok'); if(id===S.idDok&&e3) e3.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
 }
@@ -1113,9 +1148,18 @@ function kartuDok(x){
 /* ================= Kegiatan harian ================= */
 function halKeg(){
   judul('Rekap kerja harian','Kegiatan');
-  $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Waktu</div>'+fwHtml('keg')+'</div>'+
+  $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Waktu</div>'+fwHtml('keg')+'</div>'+kotakCari('keg','Cari kegiatan: nama, kategori, petugas…')+
     '<div class="stat" style="grid-template-columns:repeat(3,1fr)"><div><b id="tK">–</b><span>Kegiatan</span></div><div><b id="tV">–</b><span>Volume</span></div><div><b id="tF">–</b><span>Foto</span></div></div><div id="daftarKeg" style="margin-top:12px"></div>';
-  fwPasang('keg',muatKeg); muatKeg();
+  fwPasang('keg',muatKeg); pasangCari('keg',renderKeg); muatKeg();
+}
+function renderKeg(){
+  var e2=$('daftarKeg'); if(!e2) return;
+  var q=(S.cari.keg||'').trim(), data=S.kegData||[], hasil=data.filter(function(x){ return cocok(x,q,teksCariKeg); }), v=0, f=0;
+  S.keg={}; data.forEach(function(x){ S.keg[x.id]=x; });
+  hasil.forEach(function(x){ v+=x.volume; f+=x.fotoIds.length; });
+  $('tK').textContent=hasil.length; $('tV').textContent=Math.round(v*100)/100; $('tF').textContent=f;
+  if(!hasil.length){ e2.innerHTML=q?kosongCari('keg'):'<div class="kosong">'+ic('clip',40)+'<br>Belum ada kegiatan untuk '+fwTeks('keg')+'.</div>'; return; }
+  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' kegiatan</div>':'')+hasil.map(kartuKeg).join('');
 }
 async function muatKeg(){
   var el=$('daftarKeg'); if(!el) return;
@@ -1124,10 +1168,7 @@ async function muatKeg(){
   try{
     await swr('ambilKegiatan',[arg],function(data){
       var e2=$('daftarKeg'); if(id!==S.idKeg||!e2) return;
-      S.keg={}; var v=0,f=0;
-      data.forEach(function(x){ S.keg[x.id]=x; v+=x.volume; f+=x.fotoIds.length; });
-      $('tK').textContent=data.length; $('tV').textContent=Math.round(v*100)/100; $('tF').textContent=f;
-      e2.innerHTML=data.length?data.map(kartuKeg).join(''):'<div class="kosong">'+ic('clip',40)+'<br>Belum ada kegiatan untuk '+fwTeks('keg')+'.</div>';
+      S.kegData=data; renderKeg();
     });
   }catch(e){ var e3=$('daftarKeg'); if(id===S.idKeg&&e3) e3.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
 }
@@ -1380,7 +1421,9 @@ var AKSI={
   kamGps:function(){ bukaKameraGps(); },
   baru:function(b){ if(b.dataset.j==='kegiatan') formKeg(); else formDok(b.dataset.j); },
   tutup:tutupLembar,
-  fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); muatDok(); },
+  fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); renderDok(); },
+  cariBersih:function(b){ var p=b.dataset.p; S.cari[p]=''; var el=$('cari_'+p); if(el){ el.value=''; el.focus(); } b.classList.add('hidden'); if(p==='dok') renderDok(); else renderKeg(); },
+  cariSemua:function(b){ var p=b.dataset.p; fwGet(p).mode='semua'; if(p==='dok') halDok(); else halKeg(); },
   ai:rapikanAI,
   siapWA:function(b){ siapWA(b.dataset.id); },
   siapWAteks:function(b){ siapWA(b.dataset.id,true); },
