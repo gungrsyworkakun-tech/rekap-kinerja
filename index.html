@@ -258,9 +258,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.7';
+var KLIEN_VERSI='5.8';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='5.3';
+var KLIEN_BUTUH='5.4';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -270,6 +270,7 @@ var BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','Sep
 var HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 
 var ICON={
+ link:'<path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>',
  home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
  clip:'<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
@@ -781,12 +782,27 @@ function menuBagi(id,tersimpan){
   function mi(w,ik,t,sub,aksi,extra){ return '<button class="mi" data-aksi="'+aksi+'" data-id="'+id+'" '+(extra||'')+'><div class="ik" style="background:'+w+'">'+ic(ik,20)+'</div><div><b>'+t+'</b><span>'+sub+'</span></div></button>'; }
   bukaLembar(tersimpan?'Tersimpan ✅ Bagikan?':'Bagikan & unduh',
     '<div class="card flat"><div class="badge" style="--wr:'+JENIS[x.jenis].warna+'">'+esc(JENIS[x.jenis].nama)+'</div><div class="judul" style="margin-bottom:0">'+esc(x.judul)+'</div></div>'+
+    mi('#1d4ba3','link','Link web (tanpa PDF)','Penerima lihat detail + foto di halaman web, tanpa unduh file','linkWebDok')+
     mi('#1faa59','chat','Kirim teks + foto ke WhatsApp','Tanpa PDF, langsung teks laporan dan gambar','siapWAteks')+
     mi('#c0362c','file','Unduh PDF','Siap cetak atau kirim','ekspor','data-fmt="pdf"')+
     mi('#1faa59','chat','Kirim PDF + foto ke WhatsApp','Laporan resmi dan gambar terkirim sekaligus','siapWA')+
     mi('#1d4ba3','word','Unduh Word (.docx)','Bisa diedit lagi di Word','ekspor','data-fmt="docx"')+
     '<a class="mi" href="'+esc(waLink(teksWA(x)))+'" target="_blank" rel="noopener"><div class="ik" style="background:#1faa59">'+ic('chat',20)+'</div><div><b>Kirim ke WhatsApp (teks)</b><span>Tekan, lalu pilih kontak atau grup</span></div></a>'+
     mi('#667089','copy','Salin teks laporan','Tempel ke aplikasi lain','salin'));
+}
+async function linkWebDok(id){
+  var x=S.dok[id]; if(!x) return;
+  bukaLembar('Link web laporan','<div class="kosong"><span class="spin g" style="width:28px;height:28px;border-width:3px"></span></div>');
+  try{
+    var r=await api('buatTautanDokumen',id);
+    var u=API_URL?API_URL+'?dok='+r.token:r.url;
+    bukaLembar('Link web laporan',
+      '<div class="card flat"><div class="badge" style="--wr:'+JENIS[x.jenis].warna+'">'+esc(JENIS[x.jenis].nama)+'</div><div class="judul" style="margin-bottom:6px">'+esc(x.judul)+'</div><div class="meta" style="word-break:break-all">'+esc(u)+'</div></div>'+
+      '<div class="row" style="flex-wrap:wrap"><a class="btn sm" style="text-decoration:none" href="'+esc(u)+'" target="_blank" rel="noopener">Buka</a><button class="btn alt sm" data-aksi="lapSalin" data-u="'+esc(u)+'">Salin link</button><button class="btn alt sm" data-aksi="dokWa" data-u="'+esc(u)+'" data-id="'+id+'">WhatsApp</button></div>'+
+      '<div class="hint" style="margin-top:12px">Siapa saja yang memegang link ini bisa melihat laporan beserta fotonya di halaman web, tanpa login dan tanpa unduh file. Berlaku 90 hari. Kalau laporan kamu ubah, isi halamannya ikut berubah.</div>'+
+      '<button class="btn danger blok" style="margin-top:12px" data-aksi="cabutLinkDok" data-t="'+esc(r.token)+'" data-id="'+id+'">Cabut link ini</button>'+
+      '<button class="btn ghost blok" style="margin-top:8px" data-aksi="kembaliBagi" data-id="'+id+'">Kembali</button>');
+  }catch(e){ bukaLembar('Gagal','<div class="pesan gagal">'+esc(e.message)+'</div>'); }
 }
 async function ekspor(id,fmt){
   var x=S.dok[id];
@@ -1578,6 +1594,14 @@ var AKSI={
     if(r==='minggu') a.setDate(a.getDate()-6); else if(r==='bulan') a=new Date(d.getFullYear(),d.getMonth(),1);
     $('lpDari').value=f(a); $('lpSampai').value=f(d); },
   lapSalin:function(b){ salinTeks(b.dataset.u); },
+  linkWebDok:function(b){ linkWebDok(b.dataset.id); },
+  kembaliBagi:function(b){ menuBagi(b.dataset.id); },
+  dokWa:function(b){ var x=S.dok[b.dataset.id]; window.open(waLink(JENIS[x.jenis].nama+': '+x.judul+'\n'+b.dataset.u),'_blank'); },
+  cabutLinkDok:async function(b){
+    if(!b.dataset.sure){ b.dataset.sure='1'; b.dataset.h0=b.innerHTML; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected&&b.dataset.sure){ delete b.dataset.sure; b.innerHTML=b.dataset.h0; } },3500); return; }
+    delete b.dataset.sure; b.disabled=true; b.textContent='Mencabut…';
+    try{ await api('hapusTautan',b.dataset.t); toast('Link dicabut, tidak bisa dibuka lagi'); menuBagi(b.dataset.id); }catch(e){ b.disabled=false; b.innerHTML=b.dataset.h0||'Cabut link ini'; toast(e.message); }
+  },
   lapWa:function(b){ window.open(waLink(lapTeksWa(b.dataset.u,b.dataset.p)),'_blank'); },
   lapHapus:async function(b){ if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Yakin? Tekan lagi'; setTimeout(function(){ if(b.isConnected){ delete b.dataset.sure; b.textContent='Hapus'; } },3500); return; }
     loading(b,'…'); try{ await api('hapusTautan',b.dataset.t); toast('Link dihapus'); lapMuatDaftar(); }catch(e){ selesai(b); toast(e.message); } },
