@@ -5,6 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b2a5b">
+<meta name="referrer" content="no-referrer">
 <title>Rekap Kerja</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -208,6 +209,22 @@
   .cb input{width:20px;height:20px;flex:none;padding:0}
   .banner{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff6dc;background:color-mix(in srgb,var(--acc) 16%,transparent);border:1px solid color-mix(in srgb,var(--acc) 40%,var(--line));padding:10px 12px;border-radius:14px;font-size:14px;margin-bottom:10px}
   @media (min-width:700px){.menu{grid-template-columns:repeat(3,1fr)} #lembar{align-items:center}.ls{border-radius:26px;max-height:88vh}}
+  /* ---------- Ringan di HP ---------- */
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+  body{overscroll-behavior-y:none;text-rendering:optimizeSpeed}
+  button,a,.card.doc,.nav button{touch-action:manipulation}
+  #daftarDok>.card,#daftarKeg>.card{content-visibility:auto;contain-intrinsic-size:auto 260px}
+  .nav{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--card);box-shadow:0 -4px 18px rgba(16,24,40,.06)}
+  #ls{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .card{transition:box-shadow .2s,transform .12s}
+  .card.doc:active{transform:scale(.992)}
+  .btn:active{transform:scale(.97)}
+  .btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.nav button:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+  .nav button.on svg{transform:translateY(-1px)}
+  .lagi{display:block;width:100%;margin:4px 0 14px}
+  img{max-width:100%}
+  @media (max-width:380px){body{font-size:14.5px}.card{padding:14px}.wrap{padding:0 10px}.acts{flex-wrap:wrap}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
@@ -230,7 +247,7 @@
       <label>Nama lengkap <i>*</i></label><input id="rNama" autocomplete="name">
       <div class="g2"><div><label>NIP</label><input id="rNip" inputmode="numeric"></div><div><label>Jabatan</label><input id="rJab" placeholder="mis. Pemeriksa Pemula"></div></div>
       <label>Username <i>*</i></label><input id="rUser" autocapitalize="none" placeholder="huruf kecil / angka">
-      <label>Password <i>*</i> (min. 6 karakter)</label><input id="rPass" type="password" autocomplete="new-password">
+      <label>Password <i>*</i> (min. 8 karakter)</label><input id="rPass" type="password" autocomplete="new-password">
       <label>Kode pendaftaran</label><input id="rKode" autocapitalize="characters" placeholder="Minta ke admin kantor">
       <div class="hint">Pengguna pertama otomatis jadi admin dan boleh mengosongkan kode.</div>
       <button class="btn blok" id="btnDaftar" data-aksi="daftar">Buat akun</button>
@@ -258,9 +275,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.8';
+var KLIEN_VERSI='5.9';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='5.4';
+var KLIEN_BUTUH='5.5';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -1175,7 +1192,7 @@ function kotakCari(p,ph){
 }
 function pasangCari(p,render){
   var el=$('cari_'+p); if(!el) return; var t;
-  el.oninput=function(){ S.cari[p]=el.value; var x=$('cx_'+p); if(x) x.classList.toggle('hidden',!el.value); clearTimeout(t); t=setTimeout(render,120); };
+  el.oninput=function(){ S.cari[p]=el.value; var x=$('cx_'+p); if(x) x.classList.toggle('hidden',!el.value); clearTimeout(t); t=setTimeout(render,180); };
 }
 function kosongCari(p,teks){
   var f=fwGet(p), semua=f.mode==='semua';
@@ -1187,13 +1204,22 @@ function halDok(){
   $('isiHal').innerHTML='<div class="card" style="padding:12px"><div class="fw-judul">Jenis laporan</div><div class="chips-bar" style="padding-bottom:12px">'+chips+'</div><div class="fw-judul">Waktu</div>'+fwHtml('dok')+'</div>'+kotakCari('dok','Cari laporan: judul, tempat, petugas, isi…')+'<div id="daftarDok"></div>';
   fwPasang('dok',muatDok); pasangCari('dok',renderDok); muatDok();
 }
+/* Daftar panjang ditampilkan 25 dulu supaya HP tidak berat; sisanya lewat tombol "Tampilkan lagi" */
+var LIM={dok:25,keg:25}, LIMK={dok:'',keg:''};
+function bertahap(p,hasil,kartu){
+  var k=(S.cari[p]||'')+'|'+(p==='dok'?(S.fJenis||''):'')+'|'+JSON.stringify(fwArg(p));
+  if(LIMK[p]!==k){ LIMK[p]=k; LIM[p]=25; }
+  var n=Math.min(LIM[p],hasil.length), h=hasil.slice(0,n).map(kartu).join('');
+  if(hasil.length>n) h+='<button class="btn alt lagi" data-aksi="tampilLagi" data-p="'+p+'">Tampilkan '+Math.min(25,hasil.length-n)+' lagi (sisa '+(hasil.length-n)+')</button>';
+  return h;
+}
 function renderDok(){
   var e2=$('daftarDok'); if(!e2) return;
   var q=(S.cari.dok||'').trim(), data=(S.dokData||[]).filter(function(x){ return !S.fJenis||x.jenis===S.fJenis; });
   var hasil=data.filter(function(x){ return cocok(x,q,teksCariDok); });
   S.dok={}; (S.dokData||[]).forEach(function(x){ S.dok[x.id]=x; });
   if(!hasil.length){ e2.innerHTML=q?kosongCari('dok'):'<div class="kosong">'+ic('file',40)+'<br>Belum ada laporan untuk '+fwTeks('dok')+'.<br>Tekan <b>Buat laporan</b>.</div>'; return; }
-  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' laporan</div>':'')+hasil.map(kartuDok).join('');
+  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' laporan</div>':'')+bertahap('dok',hasil,kartuDok);
 }
 async function muatDok(){
   var el=$('daftarDok'); if(!el) return;
@@ -1233,7 +1259,7 @@ function renderKeg(){
   hasil.forEach(function(x){ v+=x.volume; f+=x.fotoIds.length; });
   $('tK').textContent=hasil.length; $('tV').textContent=Math.round(v*100)/100; $('tF').textContent=f;
   if(!hasil.length){ e2.innerHTML=q?kosongCari('keg'):'<div class="kosong">'+ic('clip',40)+'<br>Belum ada kegiatan untuk '+fwTeks('keg')+'.</div>'; return; }
-  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' kegiatan</div>':'')+hasil.map(kartuKeg).join('');
+  e2.innerHTML=(q?'<div class="hint" style="margin:0 2px 8px">Menampilkan '+hasil.length+' dari '+data.length+' kegiatan</div>':'')+bertahap('keg',hasil,kartuKeg);
 }
 async function muatKeg(){
   var el=$('daftarKeg'); if(!el) return;
@@ -1408,7 +1434,7 @@ function formEditUser(id){
     '<div class="hint">Akun dengan nama bidang yang sama bisa saling melihat laporan &amp; kegiatan. Beda bidang = tidak terlihat.</div>'+
     '<label>Peran</label><select id="uPeran"><option value="petugas"'+(x.peran==='petugas'?' selected':'')+'>Petugas</option><option value="admin"'+(x.peran==='admin'?' selected':'')+'>Admin</option></select></div>'+
     '<button class="btn blok" data-aksi="simpanUser" data-id="'+id+'" style="margin-top:0">Simpan perubahan</button>'+
-    '<div class="card flat" style="margin-top:12px"><label style="margin-top:0">Password baru untuk akun ini</label><input type="text" id="uPw" autocomplete="off" placeholder="minimal 6 karakter"><button class="btn alt blok" data-aksi="resetPwUser" data-id="'+id+'">Atur password baru</button></div>'+
+    '<div class="card flat" style="margin-top:12px"><label style="margin-top:0">Password baru untuk akun ini</label><input type="text" id="uPw" autocomplete="off" placeholder="minimal 8 karakter"><button class="btn alt blok" data-aksi="resetPwUser" data-id="'+id+'">Atur password baru</button></div>'+
     (id===S.user.id?'':'<button class="btn danger blok" data-aksi="hapusUser" data-id="'+id+'">Hapus akun ini</button>')+
     '<div class="pesan hidden" id="pesanUser"></div>');
 }
@@ -1608,6 +1634,7 @@ var AKSI={
   baru:function(b){ if(b.dataset.j==='kegiatan') formKeg(); else formDok(b.dataset.j); },
   tutup:tutupLembar,
   fJenis:function(b){ S.fJenis=b.dataset.j; document.querySelectorAll('.fc').forEach(function(c){ c.classList.toggle('on',c.dataset.j===S.fJenis); }); renderDok(); },
+  tampilLagi:function(b){ var p=b.dataset.p; LIM[p]+=25; var y=window.scrollY; if(p==='dok') renderDok(); else renderKeg(); window.scrollTo(0,y); },
   cariBersih:function(b){ var p=b.dataset.p; S.cari[p]=''; var el=$('cari_'+p); if(el){ el.value=''; el.focus(); } b.classList.add('hidden'); if(p==='dok') renderDok(); else renderKeg(); },
   cariSemua:function(b){ var p=b.dataset.p; fwGet(p).mode='semua'; if(p==='dok') halDok(); else halKeg(); },
   ai:rapikanAI,
