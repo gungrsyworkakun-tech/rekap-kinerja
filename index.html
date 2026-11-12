@@ -225,9 +225,37 @@
   img{max-width:100%}
   @media (max-width:380px){body{font-size:14.5px}.card{padding:14px}.wrap{padding:0 10px}.acts{flex-wrap:wrap}}
   @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+  /* Layar pemuatan */
+  #splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:linear-gradient(160deg,#1d4ed8,#4f7cff 60%,#6d8dff);color:#fff;text-align:center;padding:24px;transition:opacity .35s ease}
+  #splash.pergi{opacity:0;pointer-events:none}
+  #splash .sl{font-size:54px;line-height:1;animation:sdenyut 1.6s ease-in-out infinite}
+  #splash h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+  #splash .sring{width:34px;height:34px;border-radius:50%;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;animation:sputar .8s linear infinite}
+  #splash .sbar{width:150px;height:4px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden}
+  #splash .sbar i{display:block;height:100%;width:40%;border-radius:4px;background:#fff;animation:sgeser 1.3s ease-in-out infinite}
+  #splash p{margin:0;font-size:13.5px;opacity:0;max-width:260px;transition:opacity .4s}
+  #splash p.tampil{opacity:.92}
+  #splash button{display:none;margin-top:4px;border:0;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;background:#fff;color:#1d4ed8}
+  #splash button.tampil{display:inline-block}
+  @keyframes sputar{to{transform:rotate(360deg)}}
+  @keyframes sdenyut{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  @keyframes sgeser{0%{transform:translateX(-110%)}100%{transform:translateX(380%)}}
 </style>
 </head>
 <body>
+<div id="splash" role="status" aria-live="polite">
+  <div class="sl">🛂</div><h1>Rekap Kerja</h1>
+  <div class="sring"></div><div class="sbar"><i></i></div>
+  <p id="splashTeks">Memuat aplikasi…</p>
+  <button id="splashUlang" onclick="location.reload()">Muat ulang</button>
+</div>
+<script>
+(function(){
+  var t1=setTimeout(function(){ var p=document.getElementById('splashTeks'); if(p){ p.textContent='Koneksi agak lambat, mohon tunggu sebentar ya…'; p.className='tampil'; } },4000);
+  var t2=setTimeout(function(){ var p=document.getElementById('splashTeks'),b=document.getElementById('splashUlang'); if(p){ p.textContent='Masih belum terbuka. Cek internet kamu, lalu coba muat ulang.'; p.className='tampil'; } if(b) b.className='tampil'; },20000);
+  window.splashTutup=function(){ clearTimeout(t1); clearTimeout(t2); var e=document.getElementById('splash'); if(!e) return; e.classList.add('pergi'); setTimeout(function(){ if(e.parentNode) e.parentNode.removeChild(e); },420); };
+})();
+</script>
 <div id="topbar"></div>
 
 <!-- ============ MASUK / DAFTAR ============ -->
@@ -275,7 +303,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='5.9';
+var KLIEN_VERSI='6.0';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='5.5';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -1498,8 +1526,10 @@ async function tampilApp(){
 function peringatVersi(){ var b=$('verBar'); if(b) b.innerHTML='<div class="banner" style="margin:0;color:#3a2c00"><span>⚠️ <b>Kode server belum diperbarui.</b> Tempel Code.gs terbaru di Apps Script, jalankan <b>mulaiPertama</b>, lalu <b>Deploy → New version</b>. Sebelum itu, sebagian tombol bisa gagal.</span></div>'; }
 function keluarLokal(){ fdSemua(); cBersih(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
 async function boot(){
-  var t=ambilToken(); if(!t){ tampilAuth(); return; }
-  S.token=t; try{ var r=await api('saya'); S.user=r.user; tampilApp(); }catch(e){ keluarLokal(); }
+  var t=ambilToken(); if(!t){ tampilAuth(); splashTutup(); return; }
+  S.token=t;
+  try{ var r=await api('saya'); S.user=r.user; await tampilApp(); }catch(e){ keluarLokal(); }
+  splashTutup();
 }
 
 /* ================= Aksi ================= */
