@@ -1,5 +1,5 @@
 /* Rekap Kerja - service worker v2: buka instan dari simpanan, perbarui di belakang layar. */
-var CACHE = 'rekap-kerja-v2';
+var CACHE = 'rekap-kerja-v3';
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (ks) {
@@ -14,7 +14,7 @@ self.addEventListener('fetch', function (e) {
   if (r.method !== 'GET' || u.origin !== self.location.origin) return;   // panggilan ke Apps Script tidak disentuh
   e.respondWith(caches.open(CACHE).then(function (c) {
     return c.match(r, { ignoreSearch: r.mode === 'navigate' }).then(function (lama) {
-      var baru = fetch(r).then(function (res) {
+      var baru = fetch(r, { cache: 'no-cache' }).then(function (res) {
         if (res && res.ok) {
           var salinan = res.clone();
           if (lama) {
