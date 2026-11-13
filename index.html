@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f5048">
+<meta name="theme-color" content="#ffffff">
 <meta name="referrer" content="no-referrer">
 <title>Rekap Kerja</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,9 +20,7 @@
     --pri:#0f5f56;--pri2:#0b2a5b;--btn:#0f5f56;--acc:#d4a82a;--ok:#2f7d4f;--bad:#b83a2b;--warn:#b7791f;
     --soft:#eaf0fc;--sh:0 1px 2px rgba(16,24,40,.04),0 6px 18px rgba(16,24,40,.06);--r:18px;
   }
-  @media (prefers-color-scheme:dark){
-    :root{--bg:#0c111f;--card:#151c2f;--tx:#e9edf7;--mut:#97a3bd;--line:#232e48;--inp:#0f1626;--pri:#7ea6ff;--soft:#1b2745;--sh:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25)}
-  }
+  
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0}
   body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -243,75 +241,77 @@
   @keyframes sdenyut{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
   @keyframes sgeser{0%{transform:translateX(-110%)}100%{transform:translateX(380%)}}
 
-  /* ================= Tampilan v6.4: polos, hangat, tanpa gradasi ================= */
+  /* ================= Tampilan v6.5: putih bersih ================= */
   :root{
-    --bg:#f4f1ea;--card:#ffffff;--tx:#1d211e;--mut:#6b706a;--line:#e2ddd0;--inp:#fbfaf6;
+    color-scheme:light;
+    --bg:#ffffff;--card:#ffffff;--tx:#1b1f1d;--mut:#6b716c;--line:#e6e8e5;--inp:#ffffff;
     --pri:#0f5f56;--pri2:#0d4a43;--btn:#0f5f56;--acc:#d08a1e;--ok:#2f7d4f;--bad:#b83a2b;--warn:#a8661a;
-    --soft:#e5eeea;--sh:none;--r:14px;--hero:#0f5048;
+    --soft:#eef4f2;--sh:none;--r:14px;
   }
-  @media (prefers-color-scheme:dark){
-    :root{--bg:#121513;--card:#1a1f1c;--tx:#eceee8;--mut:#9aa39a;--line:#2a312c;--inp:#151a17;--pri:#5fc2b2;--btn:#1b7c70;--soft:#1e2b28;--sh:none;--hero:#0d2f2a}
-  }
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;letter-spacing:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;letter-spacing:0;background:#fff}
 
-  /* Kepala halaman: satu warna polos */
-  .top,.auth-hero{background:var(--hero)}
-  .top{padding:calc(16px + env(safe-area-inset-top)) 18px 64px;border-radius:0 0 22px 22px}
-  .top h2{font-size:22px;font-weight:700}
-  .avatar{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);font-size:17px}
-  .wrap{margin-top:-42px}
-  .auth-hero{border-radius:0 0 24px 24px}
-  .logo{border-radius:18px;background:rgba(255,255,255,.12)}
-  .auth-card{border-radius:18px;box-shadow:0 2px 0 rgba(0,0,0,.04)}
-  .seg{background:var(--bg);border-radius:12px}
+  /* Kepala halaman putih */
+  .top{background:#fff;color:var(--tx);padding:calc(14px + env(safe-area-inset-top)) 18px 14px;border-radius:0;border-bottom:1px solid var(--line)}
+  .top small{opacity:1;color:var(--mut)}
+  .top h2{font-size:22px;font-weight:700;color:var(--tx)}
+  .avatar{width:42px;height:42px;border-radius:12px;background:var(--soft);color:var(--pri);border:1px solid var(--line);font-size:17px}
+  .wrap{margin-top:14px}
+  #verBar{margin-top:0}
+  .auth-hero{background:#fff;color:var(--tx);border-radius:0;padding:46px 20px 18px}
+  .auth-hero p{opacity:1;color:var(--mut)}
+  .logo{background:var(--soft);border:1px solid var(--line);border-radius:18px;backdrop-filter:none}
+  .auth-card{margin-top:0;border-radius:16px;box-shadow:none}
+  .seg{background:var(--soft);border-radius:12px}
   .seg button{border-radius:9px}
   .seg button.on{box-shadow:none;border:1px solid var(--line)}
 
   /* Kartu & petak */
-  .card{border-radius:var(--r);padding:16px;box-shadow:none}
-  .stat div{border-radius:var(--r);box-shadow:none;background:var(--card)}
+  .card{border-radius:var(--r);padding:16px;box-shadow:none;background:#fff}
+  .stat div{border-radius:var(--r);box-shadow:none;background:var(--soft);border-color:transparent}
   .stat b{font-size:28px;font-weight:700;color:var(--pri)}
   h3.sec{margin:22px 4px 10px;font-size:12.5px;font-weight:700;letter-spacing:.7px}
   .tile{border-radius:var(--r);box-shadow:none;padding:14px}
   .tile .ik{border-radius:11px}
   .tile:active{background:var(--soft)}
   .doc::before{width:4px}
-  .badge{font-weight:700}
-  .judul{font-weight:700}
-  .chip.Selesai{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
-  .chip.Proses{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
-  .chip.Tertunda,.chip.Dieskalasi{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
+  .chip.Selesai{background:color-mix(in srgb,var(--ok) 12%,#fff);color:var(--ok)}
+  .chip.Proses{background:color-mix(in srgb,var(--warn) 14%,#fff);color:var(--warn)}
+  .chip.Tertunda,.chip.Dieskalasi{background:color-mix(in srgb,var(--bad) 11%,#fff);color:var(--bad)}
   .fc.on{background:var(--pri);color:#fff;border-color:var(--pri)}
-  @media (prefers-color-scheme:dark){.fc.on{color:#0c1210}.badge{color:color-mix(in srgb,var(--wr,var(--pri)) 45%,#fff)}}
 
-  /* Tombol & isian: polos */
+  /* Tombol & isian */
   .btn{border-radius:12px;background:var(--btn);box-shadow:none}
-  .btn.alt{background:var(--card);color:var(--pri);border:1px solid var(--line)}
+  .btn.alt{background:#fff;color:var(--pri);border:1px solid var(--line)}
   .btn.ghost{background:var(--soft);color:var(--pri)}
-  .btn.danger{background:var(--card)}
+  .btn.danger{background:#fff}
   .btn.wa{background:#1f9a52}
   .btn.gold{background:var(--acc);color:#2a1a00}
-  input,select,textarea{border-radius:12px;background:var(--inp)}
-  input:focus,select:focus,textarea:focus{background:var(--card);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 20%,transparent)}
+  input,select,textarea{border-radius:12px;background:#fff;border-color:#d9dcd8}
+  input:focus,select:focus,textarea:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 18%,transparent)}
 
-  /* Menu bawah biasa, penuh lebar */
+  /* Menu bawah */
   #app{padding-bottom:calc(130px + env(safe-area-inset-bottom))}
-  .nav{left:0;right:0;bottom:0;max-width:none;margin:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));gap:2px;border-radius:0;border:0;border-top:1px solid var(--line);background:var(--card);box-shadow:none}
+  .nav{left:0;right:0;bottom:0;max-width:none;margin:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));gap:2px;border-radius:0;border:0;border-top:1px solid var(--line);background:#fff;box-shadow:none}
   .nav button{max-width:170px;min-height:54px;border-radius:12px;font-size:12px;font-weight:600}
   .nav button.on{color:var(--pri);background:var(--soft);box-shadow:none}
-  .fab{bottom:calc(80px + env(safe-area-inset-bottom));border-radius:16px;background:var(--acc);color:#2a1a00;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  .fab{bottom:calc(80px + env(safe-area-inset-bottom));border-radius:16px;background:var(--acc);color:#2a1a00;box-shadow:0 2px 8px rgba(0,0,0,.18)}
   #toast{bottom:calc(92px + env(safe-area-inset-bottom));border-radius:12px;background:#222}
   #bannerBaru{background:var(--pri)!important;bottom:84px!important}
 
   /* Lembar bawah */
-  .ls{border-radius:20px 20px 0 0}
+  .ls{border-radius:20px 20px 0 0;background:#fff}
+  .ls-h{background:#fff}
   .mi{border-radius:14px}
   .mi .ik{border-radius:11px}
   .pesan{border-radius:12px}
-  .pesan.gagal{background:color-mix(in srgb,var(--bad) 12%,transparent)} .pesan.ok{background:color-mix(in srgb,var(--ok) 13%,transparent)}
+  .pesan.gagal{background:color-mix(in srgb,var(--bad) 10%,#fff)} .pesan.ok{background:color-mix(in srgb,var(--ok) 11%,#fff)}
 
-  /* Layar pemuatan */
-  #splash{background:var(--hero)}
+  /* Layar pemuatan putih */
+  #splash{background:#fff;color:var(--tx)}
+  #splash .sring{border-color:var(--line);border-top-color:var(--pri)}
+  #splash .sbar{background:var(--line)}
+  #splash .sbar i{background:var(--pri)}
+  #splash button{background:var(--pri);color:#fff}
 </style>
 </head>
 <body>
@@ -375,7 +375,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='6.4';
+var KLIEN_VERSI='6.5';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='5.5';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
