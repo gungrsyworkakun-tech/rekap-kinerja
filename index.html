@@ -3,6 +3,8 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b2a5b">
 <meta name="referrer" content="no-referrer">
@@ -303,9 +305,9 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='6.0';
+var KLIEN_VERSI='6.2';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
-var KLIEN_BUTUH='5.5';
+var KLIEN_BUTUH='5.6';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
 function vBanding(a,b){ var x=String(a).split('.').map(Number), y=String(b).split('.').map(Number); for(var i=0;i<3;i++){ var d=(x[i]||0)-(y[i]||0); if(d) return d<0?-1:1; } return 0; }
 /* Diisi hanya kalau halaman ini dipasang di luar Apps Script (GitHub Pages). Isi dengan link /exec. */
@@ -1449,6 +1451,13 @@ function pasangApp(){
 }
 if('serviceWorker' in navigator && API_URL && /^https:/.test(location.protocol) && !/script\.google|googleusercontent/.test(location.hostname)){
   window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{r.update();}catch(e){} }).catch(function(){}); });
+  navigator.serviceWorker.addEventListener('message',function(e){
+    if(!e.data||e.data.t!=='baru'||document.getElementById('bannerBaru')) return;
+    var d=document.createElement('div'); d.id='bannerBaru';
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:84px;z-index:9000;background:#1d4ba3;color:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px';
+    d.innerHTML='<span>Versi baru tersedia.</span><button style="border:0;border-radius:10px;padding:8px 12px;font-weight:700;background:#fff;color:#1d4ba3" onclick="location.reload()">Muat ulang</button>';
+    document.body.appendChild(d);
+  });
 }
 
 function formEditUser(id){
@@ -1489,7 +1498,9 @@ async function muatAdmin(){
       '<div class="card"><div class="judul" style="margin-top:0">🗄️ Sinkron ke MySQL</div><div class="meta" id="infoMysql" style="margin-bottom:6px">Memuat…</div>'+
       '<label style="margin-top:6px">Alamat terima.php (harus https)</label><input id="myUrl" autocapitalize="none" placeholder="https://domainmu.com/terima.php">'+
       '<label>Kunci rahasia</label><input type="password" id="myKunci" autocomplete="off" placeholder="Samakan dengan isi terima.php">'+
-      '<button class="btn blok" data-aksi="simpanMysql">Simpan pengaturan</button><button class="btn alt blok" data-aksi="sinkronMysql" style="margin-top:8px">Sinkron ke MySQL sekarang</button><div class="pesan hidden" id="pesanMysql"></div></div>'+
+      '<button class="btn blok" data-aksi="simpanMysql">Simpan pengaturan</button><button class="btn alt blok" data-aksi="sinkronMysql" style="margin-top:8px">Sinkron ke MySQL sekarang</button><div class="pesan hidden" id="pesanMysql"></div>'+
+      '<div class="judul" style="font-size:15px">🔍 Cek kecocokan Sheet &amp; MySQL</div><div class="hint" style="margin-top:0">Hanya membandingkan dan menambah yang kurang. Tidak ada data yang dihapus atau ditimpa.</div>'+
+      '<button class="btn alt blok" data-aksi="cekMysql" style="margin-top:8px">Cek kecocokan sekarang</button><div id="hasilCek" class="meta" style="margin-top:8px"></div></div>'+
       '<div class="card"><div class="judul" style="margin-top:0">👥 Pengguna ('+us.length+')</div><div class="hint" style="margin-top:0">Petugas hanya melihat data miliknya dan data akun lain yang <b>bidangnya sama</b>. Akun tanpa bidang hanya melihat datanya sendiri. Admin melihat semuanya.</div>'+(S.pengguna={},us.map(function(x){
         S.pengguna[x.id]=x;
         return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)"><div><b>'+esc(x.nama)+'</b><div class="meta">@'+esc(x.username)+(x.jabatan?' • '+esc(x.jabatan):'')+'</div>'+
@@ -1497,6 +1508,22 @@ async function muatAdmin(){
         '<button class="btn alt sm" data-aksi="editUser" data-id="'+x.id+'">'+ic('edit',16)+'Edit</button></div>';
       }).join(''))+'</div>';
   }catch(e){ el.innerHTML='<div class="pesan gagal">'+esc(e.message)+'</div>'; }
+}
+function tampilCek(r){
+  var el=$('hasilCek'); if(!el) return;
+  var N={pengguna:'Pengguna',dokumen:'Laporan',kegiatan:'Kegiatan'}, h='', kurM=0, kurS=0, beda=0;
+  ['pengguna','dokumen','kegiatan'].forEach(function(k){ var x=r[k]; if(!x) return;
+    kurM+=x.kurangMysql; if(k!=='pengguna') kurS+=x.kurangSheet; beda+=x.beda;
+    var ok=!x.kurangMysql&&!x.kurangSheet&&!x.beda;
+    h+='<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+N[k]+'</b>: Sheet '+x.sheet+', MySQL '+x.mysql+' '+(ok?'✅ cocok':'⚠️')+
+      (x.kurangMysql?'<br>• Belum ada di MySQL: <b>'+x.kurangMysql+'</b>':'')+
+      (x.kurangSheet?'<br>• Ada di MySQL tapi tidak ada di Sheet: <b>'+x.kurangSheet+'</b>'+(k==='pengguna'?' (akun tidak bisa dipulihkan ke Sheet)':''):'')+
+      (x.beda?'<br>• Isinya berbeda: <b>'+x.beda+'</b> (Sheet dianggap yang benar; kirim ulang lewat "Sinkron ke MySQL sekarang")':'')+'</div>';
+  });
+  if(kurM) h+='<button class="btn blok" data-aksi="lengkapiMysql" style="margin-top:8px">Lengkapi MySQL ('+kurM+' data)</button>';
+  if(kurS) h+='<button class="btn alt blok" data-aksi="lengkapiSheet" style="margin-top:8px">Lengkapi Sheet ('+kurS+' data)</button>';
+  if(!kurM&&!kurS&&!beda) h+='<div class="pesan ok" style="margin-top:8px">Semua cocok. Tidak ada yang perlu dilengkapi.</div>';
+  el.innerHTML=h;
 }
 async function muatMysql(){
   try{
@@ -1516,18 +1543,35 @@ function pk(id,ok,t){ var p=$(id); if(!p) return; p.className='pesan '+(ok?'ok':
 /* ================= Masuk / keluar ================= */
 function pesanAuth(t){ var p=$('pesanAuth'); p.textContent=t; p.classList.toggle('hidden',!t); }
 function tampilAuth(){ $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); }
+function simpanCache2(k,d){ try{ localStorage.setItem(k,JSON.stringify(d)); }catch(e){} }
+function bacaCache2(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } }
+function bersihCache2(){ try{ Object.keys(localStorage).filter(function(k){ return k==='rk_user'||k.indexOf('rk_set:')===0||k.indexOf('rk_nama:')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} }
+/* Tampilkan aplikasi secepat mungkin: pakai data tersimpan dulu, perbarui di belakang layar. */
 async function tampilApp(){
   $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
   $('avatar').textContent=(S.user.nama||'?').trim().charAt(0).toUpperCase();
-  try{ var r=await Promise.all([api('ambilPengaturan'),api('daftarNama')]); S.set=r[0]; S.nama=r[1]; }catch(e){}
+  var uid=S.user.id; simpanCache2('rk_user',S.user);
+  var cs=bacaCache2('rk_set:'+uid), cn=bacaCache2('rk_nama:'+uid);
+  var muat=Promise.all([api('ambilPengaturan'),api('daftarNama')]).then(function(r){ S.set=r[0]; S.nama=r[1]; simpanCache2('rk_set:'+uid,r[0]); simpanCache2('rk_nama:'+uid,r[1]); });
+  if(cs&&cn){ S.set=cs; S.nama=cn; muat.catch(function(){}); }
+  else { try{ await muat; }catch(e){} }
   go(S.tab||'home');
   call('versi',[]).then(function(v){ if(vBanding(v,KLIEN_BUTUH)<0) peringatVersi(); },peringatVersi);
 }
 function peringatVersi(){ var b=$('verBar'); if(b) b.innerHTML='<div class="banner" style="margin:0;color:#3a2c00"><span>⚠️ <b>Kode server belum diperbarui.</b> Tempel Code.gs terbaru di Apps Script, jalankan <b>mulaiPertama</b>, lalu <b>Deploy → New version</b>. Sebelum itu, sebagian tombol bisa gagal.</span></div>'; }
-function keluarLokal(){ fdSemua(); cBersih(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
+function keluarLokal(){ fdSemua(); cBersih(); bersihCache2(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
 async function boot(){
   var t=ambilToken(); if(!t){ tampilAuth(); splashTutup(); return; }
   S.token=t;
+  var cu=bacaCache2('rk_user');
+  if(cu&&cu.id){
+    /* Buka langsung dengan data tersimpan; cek sesi di belakang layar. */
+    S.user=cu;
+    var siap=tampilApp();
+    if(bacaCache2('rk_set:'+cu.id)&&bacaCache2('rk_nama:'+cu.id)) splashTutup(); else { try{ await siap; }catch(e){} splashTutup(); }
+    api('saya').then(function(r){ S.user=r.user; simpanCache2('rk_user',r.user); var av=$('avatar'); if(av) av.textContent=(r.user.nama||'?').trim().charAt(0).toUpperCase(); },function(){});
+    return;
+  }
   try{ var r=await api('saya'); S.user=r.user; await tampilApp(); }catch(e){ keluarLokal(); }
   splashTutup();
 }
@@ -1753,6 +1797,9 @@ var AKSI={
   simpanSet:async function(b){ loading(b,'Menyimpan…'); try{ await api('simpanPengaturan',{kepada:$('sKepada').value,jabatanTtd:$('sJab').value,namaTtd:$('sNama').value,zona:$('sZona').value,nomorWa:$('sWa').value}); S.set=await api('ambilPengaturan'); pk('pesanSet',true,'Pengaturan tersimpan. Berlaku di dokumen berikutnya.'); }catch(e){ pk('pesanSet',false,e.message); } selesai(b); },
   gantiKode:async function(b){ loading(b,'…'); try{ var k=await api('gantiKodeDaftar'); $('kodeDaftar').textContent=k; toast('Kode baru dibuat'); }catch(e){ toast(e.message); } selesai(b); },
   simpanMysql:async function(b){ loading(b,'Menyimpan…'); try{ await api('aturMysql',{url:$('myUrl').value,kunci:$('myKunci').value}); $('myKunci').value=''; pk('pesanMysql',true,'Pengaturan MySQL tersimpan.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); } selesai(b); },
+  cekMysql:async function(b){ loading(b,'Memeriksa…'); var el=$('hasilCek'); try{ var r=await api('cekMysql'); S.cek=r; tampilCek(r); }catch(e){ if(el) el.innerHTML='<span style="color:var(--bad)">'+esc(e.message)+'</span>'; } selesai(b); },
+  lengkapiMysql:async function(b){ loading(b,'Mengirim…'); try{ var r=await api('lengkapiMysql'); toast('Terkirim ke MySQL: laporan '+r.dokumen+', kegiatan '+r.kegiatan+', pengguna '+r.pengguna); var c=await api('cekMysql'); S.cek=c; tampilCek(c); }catch(e){ toast(e.message); } selesai(b); },
+  lengkapiSheet:async function(b){ var n=((S.cek||{}).dokumen||{}).kurangSheet+((S.cek||{}).kegiatan||{}).kurangSheet; if(!window.confirm('Ambil '+n+' data dari MySQL ke Sheet? Perhatian: data yang dulu sengaja kamu hapus dari aplikasi (masih tersimpan di MySQL) akan ikut kembali.')) return; loading(b,'Mengambil…'); try{ var r=await api('lengkapiSheet'); toast('Masuk ke Sheet: laporan '+r.dokumen+', kegiatan '+r.kegiatan); var c=await api('cekMysql'); S.cek=c; tampilCek(c); }catch(e){ toast(e.message); } selesai(b); },
   sinkronMysql:async function(b){ loading(b,'Mengirim data…'); try{ var r=await api('sinkronMysql'); pk('pesanMysql',true,'Berhasil: pengguna '+r.pengguna+', laporan '+r.dokumen+', kegiatan '+r.kegiatan+'.'); muatMysql(); }catch(e){ pk('pesanMysql',false,e.message); muatMysql(); } selesai(b); },
   backupNow:async function(b){ loading(b,'Membuat backup…'); try{ var r=await api('backupSekarang'); pk('pesanBackup',true,'Backup berhasil: '+r.laporanBaru+' laporan baru disimpan sebagai file.'+(r.laporanSisa?' Masih ada '+r.laporanSisa+' laporan, tekan lagi untuk melanjutkan.':'')); muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); } selesai(b); },
   backupOto:async function(b){ loading(b,'…'); try{ var on=await api('aturBackupHarian',!(S.bk&&S.bk.otomatis)); pk('pesanBackup',true,on?'Backup otomatis aktif: dicek tiap 10 menit, disimpan hanya kalau ada perubahan data.':'Backup otomatis dimatikan.'); selesai(b); await muatBackup(); }catch(e){ pk('pesanBackup',false,e.message); selesai(b); } },
