@@ -306,6 +306,8 @@
   .pesan{border-radius:12px}
   .pesan.gagal{background:color-mix(in srgb,var(--bad) 10%,#fff)} .pesan.ok{background:color-mix(in srgb,var(--ok) 11%,#fff)}
 
+  #antrePil{position:fixed;left:12px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:850;background:#fff;color:var(--warn);border:1px solid var(--line);border-radius:999px;padding:9px 14px;font-weight:700;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.14)}
+  #antrePil.hidden{display:none}
   /* Layar pemuatan putih */
   #splash{background:#fff;color:var(--tx)}
   #splash .sring{border-color:var(--line);border-top-color:var(--pri)}
@@ -375,7 +377,7 @@
 
 <script>
 /* ================= Dasar ================= */
-var KLIEN_VERSI='6.5';
+var KLIEN_VERSI='6.6';
 /* Versi Code.gs minimal yang dibutuhkan halaman ini. Naikkan HANYA kalau fitur baru butuh perubahan di Code.gs. */
 var KLIEN_BUTUH='5.5';
 /* fitur MySQL butuh Code.gs 4.7 -> dicek saat tombolnya dipakai */
@@ -799,6 +801,58 @@ function bacaGagal(j){ try{ var t=localStorage.getItem(kunciGagal(j)); return t?
 function hapusGagal(j){ try{ localStorage.removeItem(kunciGagal(j)); }catch(e){} }
 function tampilGalat(pe,m){ pe.textContent=m; pe.classList.remove('hidden'); try{ pe.scrollIntoView({block:'center',behavior:'smooth'}); }catch(e){} toast(m.length>90?m.slice(0,88)+'…':m); }
 
+/* ================= Antrean simpan di HP (jalan walau tanpa sinyal) ================= */
+var AQ={db:null,jalan:false,n:0};
+function aqBuka(){ return new Promise(function(res){ if(AQ.db) return res(AQ.db); try{ var r=indexedDB.open('rkAntre',1); r.onupgradeneeded=function(){ r.result.createObjectStore('q',{keyPath:'id'}); }; r.onsuccess=function(){ AQ.db=r.result; res(AQ.db); }; r.onerror=function(){ res(null); }; }catch(e){ res(null); } }); }
+function aqTx(mode,fn){ return aqBuka().then(function(db){ return new Promise(function(res){ if(!db) return res(null); try{ var t=db.transaction('q',mode),q=fn(t.objectStore('q')); t.oncomplete=function(){ res(q&&q.result!==undefined?q.result:true); }; t.onerror=t.onabort=function(){ res(null); }; }catch(e){ res(null); } }); }); }
+function aqDaftar(){ var u=S.user?S.user.id:''; return aqTx('readonly',function(o){ return o.getAll(); }).then(function(a){ return (Array.isArray(a)?a:[]).filter(function(x){ return x.uid===u; }).sort(function(x,y){ return x.waktu-y.waktu; }); }); }
+function aqTambah(fn,data,judul,ikut){ var x={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),uid:S.user?S.user.id:'',fn:fn,data:data,judul:judul||fn,ikut:ikut||null,waktu:Date.now()}; return aqTx('readwrite',function(o){ return o.put(x); }); }
+function aqUpdate(){
+  return aqDaftar().then(function(a){
+    AQ.n=a.length; var p=$('antrePil');
+    if(!p){ p=document.createElement('button'); p.id='antrePil'; p.type='button'; p.dataset.aksi='antreBuka'; document.body.appendChild(p); }
+    if(!a.length||!S.user){ p.classList.add('hidden'); return a; }
+    p.textContent='⏳ '+a.length+' data menunggu dikirim'; p.classList.remove('hidden'); return a;
+  });
+}
+async function aqKirim(manual){
+  if(AQ.jalan||!S.user) return; AQ.jalan=true; var ok=0;
+  try{
+    var a=await aqDaftar();
+    for(var i=0;i<a.length;i++){
+      var x=a[i];
+      if(x.galat&&!manual) continue;
+      if(x.galat){ delete x.galat; }
+      try{
+        await api(x.fn,x.data);
+        await aqTx('readwrite',function(o){ return o.delete(x.id); }); ok++;
+        if(x.ikut) api(x.ikut[0],x.ikut[1]).catch(function(){});
+      }catch(e){
+        if(!S.user||/Sesi habis/.test(e.message)||!navigator.onLine||bisaDiulang(e.message)) break;   /* sinyal atau server sibuk: coba lagi nanti */
+        x.galat=e.message; await aqTx('readwrite',function(o){ return o.put(x); });                    /* ditolak server: simpan alasannya, jangan dihapus */
+      }
+    }
+  }finally{ AQ.jalan=false; }
+  if(ok){ try{ cBersih(); }catch(e){} toast(ok+' data dari HP sudah terkirim ✅'); try{ if(S.tab==='dok') halDok(); else if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }catch(e){} }
+  return aqUpdate();
+}
+function aqLembar(){
+  aqDaftar().then(function(a){
+    if(!a.length){ tutupLembar(); return; }
+    var h='<div class="hint" style="margin:0 0 10px">Data ini tersimpan di HP kamu dan akan dikirim otomatis begitu ada sinyal. Jangan hapus aplikasi atau data browser sebelum terkirim.</div>';
+    a.forEach(function(x){
+      var w=new Date(x.waktu).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      h+='<div class="card flat"><div class="judul" style="font-size:15px">'+esc(x.judul)+'</div><div class="meta">Disimpan '+esc(w)+'</div>'+
+        (x.galat?'<div class="pesan gagal" style="margin-top:8px">Ditolak server: '+esc(x.galat)+'</div>':'')+
+        '<button class="btn danger blok" style="margin-top:10px" data-aksi="antreHapus" data-id="'+esc(x.id)+'">Hapus dari antrean</button></div>';
+    });
+    h+='<button class="btn blok" data-aksi="antreKirim">Kirim sekarang</button>';
+    bukaLembar('Menunggu dikirim',h);
+  });
+}
+window.addEventListener('online',function(){ setTimeout(function(){ aqKirim(); },1200); });
+setInterval(function(){ if(AQ.n&&navigator.onLine) aqKirim(); },30000);
+
 async function simpanDok(btn){
   var pe=$('pesanForm'); pe.classList.add('hidden');
   var sisa=$('lPetInput'); if(sisa&&sisa.value.trim()) tambahPetugas();
@@ -808,9 +862,14 @@ async function simpanDok(btn){
   loading(btn,'Menyimpan…'); $('btnSimpan').disabled=true; $('btnSimpanBagi').disabled=true;
   var foto=F.foto.kirim(), hapusLama=!!($('lHapusFoto')&&$('lHapusFoto').checked);
   if(!F.kunciDasar) F.kunciDasar=Math.random().toString(36).slice(2,10);
+  var muatan={id:F.id,jenis:j,data:k.data,foto:foto,hapusFotoLama:hapusLama,kunciUnik:kunciUnik(F.kunciDasar,[k.data,foto.length,hapusLama])};
   try{
-    r=await kirimAman('simpanDokumen',{id:F.id,jenis:j,data:k.data,foto:foto,hapusFotoLama:hapusLama,kunciUnik:kunciUnik(F.kunciDasar,[k.data,foto.length,hapusLama])},btn);
+    r=await kirimAman('simpanDokumen',muatan,btn);
   }catch(e){
+    if(!F.id&&(bisaDiulang(e.message)||!navigator.onLine)&&await aqTambah('simpanDokumen',muatan,String(k.data.kegiatan||k.data.judul||k.data.hal||JENIS[j].nama),['hapusDraf',j])){
+      F.sudah=true; clearTimeout(F.timer); hapusGagal(j); fdTulis('dok:'+j,[]); tutupLembar(); aqUpdate();
+      toast('Tersimpan di HP ⏳ Akan dikirim otomatis saat ada sinyal.'); return;
+    }
     if(!F.id) simpanGagal(j,k.data);
     selesai(btn); $('btnSimpan').disabled=false; $('btnSimpanBagi').disabled=false;
     tampilGalat(pe,'Belum tersimpan: '+e.message+' — Isi laporan dan foto masih aman di HP. Tekan Simpan lagi.');
@@ -1406,7 +1465,12 @@ async function simpanKeg(btn){
   if(!kegDasar) kegDasar=Math.random().toString(36).slice(2,10);
   var r;
   try{ d.kunciUnik=kunciUnik(kegDasar,[d.tanggal,d.jam,d.kegiatan,d.kategori,d.detail,d.volume,d.satuan,d.status,d.catatan,d.foto.length]); r=await kirimAman('simpanKegiatan',d,btn); }
-  catch(e){ selesai(btn); tampilGalat(pe,'Belum tersimpan: '+e.message+' — Isian dan foto masih aman di HP. Tekan Simpan lagi.'); return; }
+  catch(e){
+    if((bisaDiulang(e.message)||!navigator.onLine)&&await aqTambah('simpanKegiatan',d,String(d.kegiatan),null)){
+      kegDasar=null; fdTulis('keg',[]); tutupLembar(); aqUpdate(); toast('Tersimpan di HP ⏳ Akan dikirim otomatis saat ada sinyal.'); return;
+    }
+    selesai(btn); tampilGalat(pe,'Belum tersimpan: '+e.message+' — Isian dan foto masih aman di HP. Tekan Simpan lagi.'); return;
+  }
   kegDasar=null;
   try{ fdTulis('keg',[]); tutupLembar(); toast('Kegiatan tersimpan ✅'); if(S.tab==='keg') muatKeg(); else if(S.tab==='home') halHome(); }catch(e){}
   if(r&&r.fotoGagal) setTimeout(function(){ toast('Kegiatan tersimpan, tapi foto gagal disimpan ke Drive: '+r.fotoGagal); },700);
@@ -1626,10 +1690,11 @@ async function tampilApp(){
   if(cs&&cn){ S.set=cs; S.nama=cn; muat.catch(function(){}); }
   else { try{ await muat; }catch(e){} }
   go(S.tab||'home');
+  aqUpdate().then(function(){ if(AQ.n) setTimeout(function(){ aqKirim(); },2500); });
   call('versi',[]).then(function(v){ if(vBanding(v,KLIEN_BUTUH)<0) peringatVersi(); },peringatVersi);
 }
 function peringatVersi(){ var b=$('verBar'); if(b) b.innerHTML='<div class="banner" style="margin:0;color:#3a2c00"><span>⚠️ <b>Kode server belum diperbarui.</b> Tempel Code.gs terbaru di Apps Script, jalankan <b>mulaiPertama</b>, lalu <b>Deploy → New version</b>. Sebelum itu, sebagian tombol bisa gagal.</span></div>'; }
-function keluarLokal(){ fdSemua(); cBersih(); bersihCache2(); S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
+function keluarLokal(){ fdSemua(); cBersih(); bersihCache2(); try{ var pl=document.getElementById('antrePil'); if(pl) pl.classList.add('hidden'); }catch(e){} S.token=null; S.user=null; simpanToken(null); tutupLembar(); tampilAuth(); }
 async function boot(){
   var t=ambilToken(); if(!t){ tampilAuth(); splashTutup(); return; }
   S.token=t;
@@ -1902,7 +1967,14 @@ var AKSI={
       if(S.tab==='home') halHome(); else if(S.tab==='dok') muatDok(); else if(S.tab==='keg') muatKeg();
     }catch(e){ selesai(b); pe.textContent=e.message; pe.classList.remove('hidden'); }
   },
-  keluar:async function(){ try{ await api('keluar'); }catch(e){} keluarLokal(); }
+  antreBuka:function(){ aqLembar(); },
+  antreKirim:async function(b){ loading(b,'Mengirim…'); await aqKirim(true); selesai(b); aqLembar(); },
+  antreHapus:async function(b){ if(!window.confirm('Hapus data ini dari antrean? Data yang belum terkirim akan hilang.')) return; await aqTx('readwrite',function(o){ return o.delete(b.dataset.id); }); await aqUpdate(); aqLembar(); },
+  keluar:async function(){
+    var a=await aqDaftar();
+    if(a.length){ if(!window.confirm('Masih ada '+a.length+' data yang belum terkirim. Kalau keluar sekarang, data itu akan hilang. Tetap keluar?')) return; await aqTx('readwrite',function(o){ a.forEach(function(x){ o.delete(x.id); }); }); }
+    try{ await api('keluar'); }catch(e){} keluarLokal();
+  }
 };
 function menuBaru(){
   bukaLembar('Buat laporan apa?',URUT.map(function(k){ var J=JENIS[k];
